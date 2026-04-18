@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Time Tracker — Mockup (Vercel-inspired)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Vercel core */
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-alt: #fafafa;
+    --text: #171717;
+    --text-muted: #4d4d4d;
+    --text-subtle: #666666;
+    --text-faint: #808080;
+    --gray-100: #ebebeb;
+    --gray-50: #fafafa;
+
+    /* Shadow-as-border */
+    --ring: rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
+    --ring-light: rgb(235, 235, 235) 0px 0px 0px 1px;
+    --card-shadow:
+      rgba(0, 0, 0, 0.08) 0px 0px 0px 1px,
+      rgba(0, 0, 0, 0.04) 0px 2px 2px,
+      rgba(0, 0, 0, 0.04) 0px 8px 8px -8px,
+      #fafafa 0px 0px 0px 1px inset;
+    --card-shadow-subtle:
+      rgba(0, 0, 0, 0.08) 0px 0px 0px 1px,
+      rgba(0, 0, 0, 0.04) 0px 2px 2px;
+
+    /* Focus */
+    --focus: hsla(212, 100%, 48%, 1);
+
+    /* Accent — Track time (only exception to monochrome system) */
+    --accent: #0F5D3A;
+    --accent-hover: #0B4B2F;
+
+    /* Stop / negative */
+    --dark: #171717;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    font-family: 'Geist', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+    font-feature-settings: "liga";
+    font-size: 14px;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .mono {
+    font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "liga";
+  }
+
+  button { font-family: inherit; }
+  input, select, textarea { font-family: inherit; }
+
+  /* ============ TOP NAV ============ */
+  .topnav {
+    background: var(--surface);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+    height: 56px;
+    display: flex; align-items: center;
+    padding: 0 24px;
+    gap: 28px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 15px; letter-spacing: -0.32px;
+    margin-right: 8px;
+  }
+  .brand-mark {
+    width: 24px; height: 24px; border-radius: 4px;
+    background: var(--text); color: #fff;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 600;
+  }
+
+  .nav-items { display: flex; gap: 2px; flex: 1; }
+  .nav-item {
+    padding: 8px 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 6px;
+    user-select: none;
+    letter-spacing: 0;
+  }
+  .nav-item:hover { color: var(--text); background: var(--surface-alt); }
+  .nav-item.active { color: var(--text); font-weight: 600; }
+
+  .nav-right { display: flex; align-items: center; gap: 14px; }
+  .nav-link { color: var(--text-muted); cursor: pointer; font-weight: 500; font-size: 14px; }
+  .nav-link:hover { color: var(--text); }
+
+  .avatar {
+    width: 28px; height: 28px; border-radius: 999px;
+    background: #171717; color: #fff;
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 600;
+  }
+  .avatar-wrap { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+
+  /* Dark pill CTA (Vercel style) — reserved for primary CTAs on other screens */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 12px;
+    border-radius: 6px;
+    font-size: 14px; font-weight: 500;
+    border: none;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--ring-light);
+    cursor: pointer;
+    transition: background 120ms, box-shadow 120ms;
+    letter-spacing: 0;
+  }
+  .btn:hover { background: var(--surface-alt); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .btn-dark {
+    background: var(--dark); color: #fff;
+    box-shadow: none;
+  }
+  .btn-dark:hover { background: #2a2a2a; }
+  .btn-icon { width: 14px; height: 14px; }
+
+  /* ============ PAGE ============ */
+  .page { max-width: 1200px; margin: 0 auto; padding: 32px 32px 80px; }
+
+  /* Header row */
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .date-nav { display: flex; align-items: center; gap: 10px; }
+  .nav-btn {
+    width: 32px; height: 32px;
+    border: none; background: var(--surface);
+    border-radius: 6px; cursor: pointer;
+    display: grid; place-items: center;
+    color: var(--text-muted);
+    box-shadow: var(--ring-light);
+    transition: background 120ms;
+  }
+  .nav-btn:hover { background: var(--surface-alt); color: var(--text); }
+  .date-title {
+    font-size: 28px; font-weight: 600;
+    letter-spacing: -1.12px;
+    line-height: 1.2;
+  }
+  .date-title .label { color: var(--text-muted); margin-right: 6px; font-weight: 500; }
+
+  .view-toggle { display: flex; align-items: center; gap: 8px; }
+  .icon-pill {
+    width: 32px; height: 32px;
+    border: none; background: var(--surface);
+    border-radius: 6px; display: grid; place-items: center;
+    color: var(--text-muted); cursor: pointer;
+    box-shadow: var(--ring-light);
+  }
+  .icon-pill:hover { color: var(--text); background: var(--surface-alt); }
+  .seg {
+    display: inline-flex;
+    border-radius: 6px;
+    background: var(--surface);
+    box-shadow: var(--ring-light);
+    overflow: hidden;
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg button {
+    border: none; background: transparent;
+    padding: 0 14px; height: 28px;
+    font-size: 14px; font-weight: 500;
+    color: var(--text-muted); cursor: pointer;
+    border-radius: 4px;
+  }
+  .seg button.active { background: var(--dark); color: #fff; }
+
+  /* ============ TRACK TIME + ENTRIES ============ */
+  .tracker {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* Track time — green square with + inside, label BELOW the square */
+  .track-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding-top: 4px;
+  }
+  .track-btn {
+    width: 92px; height: 92px;
+    background: var(--accent);
+    border: none; border-radius: 8px;
+    color: #fff; cursor: pointer;
+    display: grid; place-items: center;
+    transition: background 120ms, transform 120ms;
+    box-shadow: var(--ring-light);
+  }
+  .track-btn:hover { background: var(--accent-hover); }
+  .track-btn:active { transform: scale(0.98); }
+  .track-btn svg { width: 36px; height: 36px; }
+  .track-label {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    letter-spacing: 0;
+  }
+
+  /* Panel (card with Vercel shadow stack) */
+  .panel {
+    background: var(--surface);
+    border-radius: 10px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+  }
+
+  /* Day strip */
+  .day-strip {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr) 1.15fr;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+  .day {
+    padding: 14px 14px 14px;
+    cursor: pointer;
+    box-shadow: 1px 0 0 rgba(0,0,0,0.06);
+    transition: background 120ms;
+  }
+  .day:hover { background: var(--surface-alt); }
+  .day:last-child { box-shadow: none; }
+  .day .name { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .day .hrs {
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 15px; font-weight: 500; margin-top: 4px; color: var(--text);
+  }
+  .day.zero .hrs { color: var(--text-faint); }
+  .day.active { position: relative; }
+  .day.active::after {
+    content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px;
+    background: var(--accent);
+  }
+  .day.active .name { color: var(--text); font-weight: 600; }
+  .day.week-total { background: var(--surface-alt); cursor: default; }
+  .day.week-total .name { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .day.week-total .hrs { color: var(--text); font-weight: 600; font-size: 16px; }
+
+  /* Entry rows */
+  .entries { background: var(--surface); }
+  .entry {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+    transition: background 120ms;
+  }
+  .entry:last-of-type { box-shadow: none; }
+  .entry.running { background: var(--surface-alt); }
+  .entry-info { min-width: 0; }
+  .entry-title {
+    font-weight: 600; font-size: 14px; letter-spacing: -0.14px;
+  }
+  .entry-title .client { color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+  .entry-task { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+  .entry-time {
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 16px; font-weight: 500;
+    min-width: 54px; text-align: right;
+  }
+  .btn-start { color: var(--text); }
+  .btn-stop {
+    background: var(--dark); color: #fff; box-shadow: none;
+  }
+  .btn-stop:hover { background: #2a2a2a; }
+
+  /* Total */
+  .total-row {
+    display: flex; justify-content: flex-end; align-items: baseline;
+    gap: 14px;
+    padding: 22px 24px;
+    background: var(--surface);
+  }
+  .total-row .label { color: var(--text-muted); font-size: 14px; }
+  .total-row .value {
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 18px; font-weight: 600;
+  }
+
+  /* ============ Other screens ============ */
+  .screen { display: none; }
+  .screen.active { display: block; animation: fade 200ms ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .topbar h1 { font-size: 28px; font-weight: 600; letter-spacing: -1.12px; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  /* Week grid */
+  .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .week-grid {
+    background: var(--surface);
+    border-radius: 10px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+  }
+  .week-header, .week-row, .week-footer {
+    display: grid; grid-template-columns: 260px repeat(7, 1fr) 100px;
+  }
+  .week-header { background: var(--surface-alt); box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
+  .week-header .cell {
+    padding: 12px 10px; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); font-weight: 600; text-align: center;
+  }
+  .week-header .cell.first { text-align: left; }
+  .week-header .cell.total { text-align: right; }
+  .week-header .cell .day-num {
+    display: block; font-family: 'Geist Mono', monospace;
+    font-size: 14px; font-weight: 600; color: var(--text);
+    margin-top: 2px; text-transform: none; letter-spacing: 0;
+  }
+  .week-header .cell.today .day-num { color: var(--accent); }
+  .week-header .cell.today { position: relative; }
+  .week-header .cell.today::after {
+    content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px;
+    background: var(--accent);
+  }
+
+  .week-row { box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
+  .week-row:nth-child(even) { background: var(--surface-alt); }
+  .week-row .cell {
+    padding: 14px 10px; text-align: center;
+    font-family: 'Geist Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px; color: var(--text-muted);
+  }
+  .week-row .cell.first {
+    text-align: left; font-family: 'Geist', sans-serif;
+    font-size: 14px; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .week-row .cell.filled { color: var(--text); font-weight: 500; }
+  .week-row .cell.total { text-align: right; color: var(--text); font-weight: 600; background: rgba(0,0,0,0.02); }
+  .week-row .row-label { font-weight: 500; }
+  .week-row .row-task { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+
+  .week-footer { background: var(--dark); color: #fff; }
+  .week-footer .cell {
+    padding: 14px 10px; font-family: 'Geist Mono', monospace;
+    font-weight: 600; font-size: 14px; text-align: center;
+  }
+  .week-footer .cell.first {
+    text-align: left; font-family: 'Geist', sans-serif;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: rgba(255,255,255,0.7);
+  }
+  .week-footer .cell.total { text-align: right; font-size: 15px; }
+  .add-row {
+    padding: 14px 20px; color: var(--text-muted);
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+    cursor: pointer;
+  }
+  .add-row:hover { background: var(--surface-alt); color: var(--text); }
+
+  /* Projects table */
+  .dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+  .table { background: var(--surface); border-radius: 10px; box-shadow: var(--card-shadow); overflow: hidden; }
+  .table-head, .table-row {
+    display: grid; grid-template-columns: 1fr 180px 120px 140px 140px 40px;
+    align-items: center; padding: 14px 20px; gap: 16px;
+  }
+  .table-head {
+    background: var(--surface-alt);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted); font-weight: 600;
+  }
+  .table-row { box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
+  .table-row:last-child { box-shadow: none; }
+  .table-row:hover { background: var(--surface-alt); }
+  .project-name { display: flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: -0.14px; }
+  .status-pill {
+    display: inline-flex; padding: 2px 10px;
+    border-radius: 9999px;
+    font-size: 12px; font-weight: 500;
+  }
+  .status-active { background: #ebf5ff; color: #0068d6; }
+  .status-archived { background: var(--surface-alt); color: var(--text-muted); box-shadow: var(--ring-light); }
+
+  .search {
+    height: 32px; padding: 0 12px;
+    border: none; border-radius: 6px;
+    background: var(--surface); box-shadow: var(--ring-light);
+    font-size: 14px; width: 220px;
+    outline: none;
+  }
+  .search:focus { box-shadow: 0 0 0 2px var(--focus); }
+
+  /* Note */
+  .note {
+    margin-top: 40px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border-radius: 8px;
+    box-shadow: var(--ring-light);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .note strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ========== TOP NAV (Vercel style: white, sticky, shadow-bottom) ========== -->
+<nav class="topnav">
+  <div class="brand">
+    <div class="brand-mark">T</div>
+    <div>Tracker</div>
+  </div>
+  <div class="nav-items">
+    <div class="nav-item active" data-screen="timer">Time</div>
+    <div class="nav-item" data-screen="week">Week</div>
+    <div class="nav-item" data-screen="projects">Projects</div>
+    <div class="nav-item">Tasks</div>
+    <div class="nav-item">Reports</div>
+  </div>
+  <div class="nav-right">
+    <div class="nav-link">Settings</div>
+    <div class="avatar-wrap">
+      <div class="avatar">G</div>
+    </div>
+  </div>
+</nav>
+
+<!-- ========== SCREEN: TIMER ========== -->
+<section class="screen active" id="screen-timer">
+  <div class="page">
+
+    <div class="page-header">
+      <div class="date-nav">
+        <button class="nav-btn" aria-label="Previous day">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button class="nav-btn" aria-label="Next day">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <div class="date-title"><span class="label">Today:</span>Saturday, 18 Apr</div>
+      </div>
+      <div class="view-toggle">
+        <button class="icon-pill" aria-label="Pick date">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+        </button>
+        <div class="seg">
+          <button class="active">Day</button>
+          <button>Week</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tracker">
+      <div class="track-wrap">
+        <button class="track-btn" title="Track time" aria-label="Track time">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <div class="track-label">Track time</div>
+      </div>
+
+      <div class="panel">
+        <!-- Day strip -->
+        <div class="day-strip">
+          <div class="day"><div class="name">Mon</div><div class="hrs">5:00</div></div>
+          <div class="day"><div class="name">Tue</div><div class="hrs">5:30</div></div>
+          <div class="day"><div class="name">Wed</div><div class="hrs">4:30</div></div>
+          <div class="day"><div class="name">Thu</div><div class="hrs">3:15</div></div>
+          <div class="day"><div class="name">Fri</div><div class="hrs">4:00</div></div>
+          <div class="day active"><div class="name">Sat</div><div class="hrs">4:27</div></div>
+          <div class="day zero"><div class="name">Sun</div><div class="hrs">0:00</div></div>
+          <div class="day week-total"><div class="name">Week total</div><div class="hrs">26:42</div></div>
+        </div>
+
+        <!-- Entries -->
+        <div class="entries">
+          <div class="entry">
+            <div class="entry-info">
+              <div class="entry-title">Personal site redesign <span class="client">(Personal)</span></div>
+              <div class="entry-task">Development</div>
+            </div>
+            <div class="entry-time">2:15</div>
+            <button class="btn btn-start">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              Start
+            </button>
+            <button class="btn">Edit</button>
+          </div>
+
+          <div class="entry">
+            <div class="entry-info">
+              <div class="entry-title">Freelance — Acme Co. <span class="client">(Acme Co.)</span></div>
+              <div class="entry-task">Meetings</div>
+            </div>
+            <div class="entry-time">1:00</div>
+            <button class="btn btn-start">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              Start
+            </button>
+            <button class="btn">Edit</button>
+          </div>
+
+          <div class="entry">
+            <div class="entry-info">
+              <div class="entry-title">Learning Rust <span class="client">(Personal)</span></div>
+              <div class="entry-task">Research</div>
+            </div>
+            <div class="entry-time">0:30</div>
+            <button class="btn btn-start">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              Start
+            </button>
+            <button class="btn">Edit</button>
+          </div>
+
+          <div class="entry running">
+            <div class="entry-info">
+              <div class="entry-title">Personal site redesign <span class="client">(Personal)</span></div>
+              <div class="entry-task">Design</div>
+            </div>
+            <div class="entry-time">0:42</div>
+            <button class="btn btn-stop">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              Stop
+            </button>
+            <button class="btn">Edit</button>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="total-row">
+          <div class="label">Total:</div>
+          <div class="value">4:27</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>Vercel-inspired mockup.</strong> Geist font, shadow-as-border system (no traditional CSS borders), near-black <code>#171717</code> text on pure white. The green Track-time button is kept as the single functional accent — everything else stays monochrome.
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCREEN: WEEK ========== -->
+<section class="screen" id="screen-week">
+  <div class="page">
+    <div class="topbar">
+      <h1>Week view</h1>
+      <div class="topbar-right">
+        <button class="btn">Export CSV</button>
+        <button class="btn btn-dark">+ Add row</button>
+      </div>
+    </div>
+
+    <div class="week-nav">
+      <div class="date-nav">
+        <button class="nav-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <button class="nav-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+        <div style="font-weight:600; font-size:16px; letter-spacing:-0.32px;">Apr 13 — 19, 2026</div>
+        <button class="btn" style="margin-left: 8px;">This week</button>
+      </div>
+      <div style="color: var(--text-muted); font-size: 13px;">Week total · <strong class="mono" style="color:var(--text);">26:42</strong></div>
+    </div>
+
+    <div class="week-grid">
+      <div class="week-header">
+        <div class="cell first">Project · Task</div>
+        <div class="cell">Mon <span class="day-num">13</span></div>
+        <div class="cell">Tue <span class="day-num">14</span></div>
+        <div class="cell">Wed <span class="day-num">15</span></div>
+        <div class="cell">Thu <span class="day-num">16</span></div>
+        <div class="cell">Fri <span class="day-num">17</span></div>
+        <div class="cell today">Sat <span class="day-num">18</span></div>
+        <div class="cell">Sun <span class="day-num">19</span></div>
+        <div class="cell total">Total</div>
+      </div>
+
+      <div class="week-row">
+        <div class="cell first"><span class="dot" style="background:#171717;"></span><div><div class="row-label">Personal site redesign</div><div class="row-task">Development</div></div></div>
+        <div class="cell filled">2:00</div><div class="cell filled">1:30</div><div class="cell">—</div><div class="cell filled">3:15</div><div class="cell filled">2:00</div><div class="cell filled">2:15</div><div class="cell">—</div><div class="cell total">11:00</div>
+      </div>
+      <div class="week-row">
+        <div class="cell first"><span class="dot" style="background:#171717;"></span><div><div class="row-label">Personal site redesign</div><div class="row-task">Design</div></div></div>
+        <div class="cell">—</div><div class="cell filled">0:45</div><div class="cell filled">1:30</div><div class="cell">—</div><div class="cell">—</div><div class="cell filled">0:42</div><div class="cell">—</div><div class="cell total">2:57</div>
+      </div>
+      <div class="week-row">
+        <div class="cell first"><span class="dot" style="background:#666;"></span><div><div class="row-label">Freelance — Acme Co.</div><div class="row-task">Development</div></div></div>
+        <div class="cell filled">3:00</div><div class="cell filled">2:45</div><div class="cell filled">2:00</div><div class="cell">—</div><div class="cell filled">1:30</div><div class="cell">—</div><div class="cell">—</div><div class="cell total">9:15</div>
+      </div>
+      <div class="week-row">
+        <div class="cell first"><span class="dot" style="background:#666;"></span><div><div class="row-label">Freelance — Acme Co.</div><div class="row-task">Meetings</div></div></div>
+        <div class="cell">—</div><div class="cell filled">0:30</div><div class="cell">—</div><div class="cell">—</div><div class="cell filled">0:30</div><div class="cell filled">1:00</div><div class="cell">—</div><div class="cell total">2:00</div>
+      </div>
+      <div class="week-row">
+        <div class="cell first"><span class="dot" style="background:#bbb;"></span><div><div class="row-label">Learning Rust</div><div class="row-task">Research</div></div></div>
+        <div class="cell">—</div><div class="cell">—</div><div class="cell filled">1:00</div><div class="cell">—</div><div class="cell">—</div><div class="cell filled">0:30</div><div class="cell">—</div><div class="cell total">1:30</div>
+      </div>
+
+      <div class="add-row">+ Add a row</div>
+
+      <div class="week-footer">
+        <div class="cell first">Daily total</div>
+        <div class="cell">5:00</div><div class="cell">5:30</div><div class="cell">4:30</div><div class="cell">3:15</div><div class="cell">4:00</div><div class="cell">4:27</div><div class="cell">0:00</div>
+        <div class="cell total">26:42</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCREEN: PROJECTS ========== -->
+<section class="screen" id="screen-projects">
+  <div class="page">
+    <div class="topbar">
+      <h1>Projects</h1>
+      <div class="topbar-right">
+        <input class="search" placeholder="Search projects…" />
+        <button class="btn btn-dark">+ New project</button>
+      </div>
+    </div>
+
+    <div class="table">
+      <div class="table-head">
+        <div>Project</div><div>Client</div><div>Status</div><div>Hours (total)</div><div>Created</div><div></div>
+      </div>
+      <div class="table-row">
+        <div class="project-name"><span class="dot" style="background:#171717;"></span>Personal site redesign</div>
+        <div style="color: var(--text-muted);">Personal</div>
+        <div><span class="status-pill status-active">Active</span></div>
+        <div class="mono">34:12</div>
+        <div style="color: var(--text-muted); font-size: 13px;">Mar 28, 2026</div><div></div>
+      </div>
+      <div class="table-row">
+        <div class="project-name"><span class="dot" style="background:#171717;"></span>Freelance — Acme Co.</div>
+        <div>Acme Co.</div>
+        <div><span class="status-pill status-active">Active</span></div>
+        <div class="mono">128:45</div>
+        <div style="color: var(--text-muted); font-size: 13px;">Jan 12, 2026</div><div></div>
+      </div>
+      <div class="table-row">
+        <div class="project-name"><span class="dot" style="background:#666;"></span>Learning Rust</div>
+        <div style="color: var(--text-muted);">Personal</div>
+        <div><span class="status-pill status-active">Active</span></div>
+        <div class="mono">18:30</div>
+        <div style="color: var(--text-muted); font-size: 13px;">Feb 5, 2026</div><div></div>
+      </div>
+      <div class="table-row">
+        <div class="project-name"><span class="dot" style="background:#bbb;"></span>Old blog migration</div>
+        <div>Personal</div>
+        <div><span class="status-pill status-archived">Archived</span></div>
+        <div class="mono">12:00</div>
+        <div style="color: var(--text-muted); font-size: 13px;">Nov 2, 2025</div><div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll('.nav-item[data-screen]').forEach(item => {
+    item.addEventListener('click', () => {
+      const target = item.dataset.screen;
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + target).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
