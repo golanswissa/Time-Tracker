@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Pencil, Printer } from 'lucide-react';
-import { useStore } from '../store';
+import { ChevronLeft, FileText, Pencil, Printer } from 'lucide-react';
+import { computeProjectMonthAmount, useStore } from '../store';
 import { EntryModal } from '../components/EntryModal';
+import { CreateInvoiceModal } from '../components/CreateInvoiceModal';
 import type { Entry } from '../types';
 import {
   effectiveRate,
@@ -19,15 +20,15 @@ import {
 interface Props {
   initialClientId?: string | null;
   onConsumedInitial?: () => void;
+  onOpenInvoice: (id: string) => void;
 }
 
 /** Flow: select client → select month → month detail (printable). */
-export function ReportsPage({ initialClientId, onConsumedInitial }: Props) {
+export function ReportsPage({ initialClientId, onConsumedInitial, onOpenInvoice }: Props) {
   const clients = useStore((s) => s.clients);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  // Consume initial client once, if provided
   useEffect(() => {
     if (initialClientId) {
       setSelectedClientId(initialClientId);
@@ -43,6 +44,7 @@ export function ReportsPage({ initialClientId, onConsumedInitial }: Props) {
         clientId={selectedClientId}
         monthKey={selectedMonth}
         onBack={() => setSelectedMonth(null)}
+        onOpenInvoice={onOpenInvoice}
       />
     );
   }
@@ -73,22 +75,42 @@ function ClientPicker({
   const settings = useStore((s) => s.settings);
 
   const stats = useMemo(() => {
-    const map = new Map<string, { total: number; earned: number; months: Set<string> }>();
-    for (const c of clients) map.set(c.id, { total: 0, earned: 0, months: new Set() });
+    // First aggregate per (client, month, project) seconds, then compute amount
+    // using tier-aware logic so totals match the report views.
+    const perClient = new Map<string, { total: number; earned: number; months: Set<string> }>();
+    for (const c of clients) perClient.set(c.id, { total: 0, earned: 0, months: new Set() });
+
+    type Bucket = { seconds: number; projectId: string; clientId: string; monthKey: string };
+    const bucket = new Map<string, Bucket>();
     for (const e of entries) {
       const project = projects.find((p) => p.id === e.projectId);
       if (!project) continue;
-      const s = map.get(project.clientId);
-      if (!s) continue;
-      const sec = entrySeconds(e);
-      s.total += sec;
-      s.months.add(monthKeyFromDateKey(e.date));
-      const client = clients.find((c) => c.id === project.clientId);
-      const override = rateOverrides?.[monthKeyFromDateKey(e.date)]?.[e.projectId];
-      const rate = effectiveRate(project, client, override);
-      if (rate > 0) s.earned += secondsToHours(sec) * rate;
+      const mk = monthKeyFromDateKey(e.date);
+      const key = `${project.clientId}|${mk}|${e.projectId}`;
+      if (!bucket.has(key)) {
+        bucket.set(key, {
+          seconds: 0,
+          projectId: e.projectId,
+          clientId: project.clientId,
+          monthKey: mk,
+        });
+      }
+      bucket.get(key)!.seconds += entrySeconds(e);
+      const cs = perClient.get(project.clientId);
+      if (cs) cs.months.add(mk);
     }
-    return map;
+    for (const b of bucket.values()) {
+      const project = projects.find((p) => p.id === b.projectId);
+      const client = clients.find((c) => c.id === b.clientId);
+      const override = rateOverrides?.[b.monthKey]?.[b.projectId];
+      const amt = computeProjectMonthAmount(secondsToHours(b.seconds), project, client, override);
+      const cs = perClient.get(b.clientId);
+      if (cs) {
+        cs.total += b.seconds;
+        cs.earned += amt;
+      }
+    }
+    return perClient;
   }, [clients, projects, entries, rateOverrides]);
 
   return (
@@ -171,20 +193,25 @@ function ClientMonths({
   );
 
   const months = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; seconds: number; earned: number }>();
+    type Row = { key: string; label: string; seconds: number; earned: number; perProject: Map<string, number> };
+    const map = new Map<string, Row>();
     for (const e of entries) {
       if (!clientProjectIds.has(e.projectId)) continue;
       const mk = monthKeyFromDateKey(e.date);
       if (!map.has(mk)) {
-        map.set(mk, { key: mk, label: formatMonthLong(parseMonthKey(mk)), seconds: 0, earned: 0 });
+        map.set(mk, { key: mk, label: formatMonthLong(parseMonthKey(mk)), seconds: 0, earned: 0, perProject: new Map() });
       }
       const m = map.get(mk)!;
       const sec = entrySeconds(e);
       m.seconds += sec;
-      const project = projects.find((p) => p.id === e.projectId);
-      const override = rateOverrides?.[mk]?.[e.projectId];
-      const rate = effectiveRate(project, client, override);
-      if (rate > 0) m.earned += secondsToHours(sec) * rate;
+      m.perProject.set(e.projectId, (m.perProject.get(e.projectId) || 0) + sec);
+    }
+    for (const m of map.values()) {
+      for (const [pid, sec] of m.perProject) {
+        const project = projects.find((p) => p.id === pid);
+        const override = rateOverrides?.[m.key]?.[pid];
+        m.earned += computeProjectMonthAmount(secondsToHours(sec), project, client, override);
+      }
     }
     return Array.from(map.values()).sort((a, b) => (a.key < b.key ? 1 : -1));
   }, [entries, clientProjectIds, projects, client, rateOverrides]);
@@ -248,10 +275,12 @@ function MonthDetail({
   clientId,
   monthKey,
   onBack,
+  onOpenInvoice,
 }: {
   clientId: string;
   monthKey: string;
   onBack: () => void;
+  onOpenInvoice: (id: string) => void;
 }) {
   const client = useStore((s) => s.clients.find((c) => c.id === clientId));
   const projects = useStore((s) => s.projects.filter((p) => p.clientId === clientId));
@@ -260,8 +289,11 @@ function MonthDetail({
   const rateOverrides = useStore((s) => s.rateOverrides);
   const setRateOverride = useStore((s) => s.setRateOverride);
   const settings = useStore((s) => s.settings);
+  const invoices = useStore((s) => s.invoices);
+  const generateInvoiceFromMonth = useStore((s) => s.generateInvoiceFromMonth);
 
   const [editing, setEditing] = useState<Entry | null | undefined>(undefined);
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false);
 
   const monthLabel = formatMonthLong(parseMonthKey(monthKey));
   const monthOverrides = rateOverrides?.[monthKey] || {};
@@ -275,6 +307,11 @@ function MonthDetail({
     [allEntries, clientProjectIds, monthKey]
   );
 
+  const existingInvoice = useMemo(
+    () => invoices.find((inv) => inv.clientId === clientId && inv.monthKey === monthKey),
+    [invoices, clientId, monthKey]
+  );
+
   interface ProjectSummary {
     projectId: string;
     seconds: number;
@@ -282,6 +319,7 @@ function MonthDetail({
     defaultRate: number;
     amount: number;
     hasOverride: boolean;
+    isTiered: boolean;
   }
 
   const projectSummaries: ProjectSummary[] = useMemo(() => {
@@ -290,6 +328,7 @@ function MonthDetail({
       const project = projects.find((p) => p.id === e.projectId);
       const defaultRate = effectiveRate(project, client, undefined);
       const override = monthOverrides[e.projectId];
+      const isTiered = !!project?.rateTiers && project.rateTiers.length > 0 && override == null;
       const rate = override != null ? override : defaultRate;
       if (!map.has(e.projectId)) {
         map.set(e.projectId, {
@@ -299,12 +338,21 @@ function MonthDetail({
           defaultRate,
           amount: 0,
           hasOverride: override != null,
+          isTiered,
         });
       }
       const s = map.get(e.projectId)!;
       s.seconds += entrySeconds(e);
     }
-    for (const s of map.values()) s.amount = secondsToHours(s.seconds) * s.rate;
+    for (const s of map.values()) {
+      const project = projects.find((p) => p.id === s.projectId);
+      s.amount = computeProjectMonthAmount(
+        secondsToHours(s.seconds),
+        project,
+        client,
+        s.hasOverride ? s.rate : undefined
+      );
+    }
     return Array.from(map.values()).sort((a, b) => b.seconds - a.seconds);
   }, [monthEntries, projects, monthOverrides, client]);
 
@@ -333,6 +381,20 @@ function MonthDetail({
     setRateOverride(monthKey, projectId, n);
   };
 
+  const onGenerateInvoice = () => {
+    if (existingInvoice) {
+      onOpenInvoice(existingInvoice.id);
+      return;
+    }
+    if (!client) return;
+    if (totalSeconds === 0) {
+      alert('Track some time before generating an invoice.');
+      return;
+    }
+    const inv = generateInvoiceFromMonth(client.id, monthKey);
+    onOpenInvoice(inv.id);
+  };
+
   if (!client) return null;
 
   return (
@@ -346,6 +408,13 @@ function MonthDetail({
           <h1>{client.name} — {monthLabel}</h1>
         </div>
         <div className="topbar-right">
+          <button className="btn" onClick={onGenerateInvoice}>
+            <FileText size={14} />
+            {existingInvoice ? `Open invoice ${existingInvoice.number}` : 'Generate invoice'}
+          </button>
+          <button className="btn" onClick={() => setShowCreateInvoice(true)}>
+            More…
+          </button>
           <button className="btn btn-dark" onClick={() => window.print()}>
             <Printer size={14} />
             Export PDF
@@ -406,29 +475,35 @@ function MonthDetail({
                 {formatDuration(s.seconds, settings.timeFormat)}
               </div>
               <div className="row" style={{ gap: 6 }}>
-                <div className="rate-input-wrap no-print">
-                  <span className="rate-prefix">{settings.currencySymbol}</span>
-                  <input
-                    className="rate-input mono"
-                    value={s.hasOverride ? String(s.rate) : (s.defaultRate || '')}
-                    placeholder={s.defaultRate ? String(s.defaultRate) : '0'}
-                    onChange={(e) => onRateChange(s.projectId, e.target.value)}
-                    inputMode="decimal"
-                    aria-label="Hourly rate for this month"
-                  />
-                </div>
-                <span className="print-only mono">
-                  {s.rate > 0 ? formatMoney(s.rate, settings.currencySymbol) : '—'}
-                </span>
-                {s.hasOverride && (
-                  <button
-                    className="iconbtn-ghost no-print"
-                    title={`Reset to default ${s.defaultRate ? formatMoney(s.defaultRate, settings.currencySymbol) : '—'}`}
-                    onClick={() => setRateOverride(monthKey, s.projectId, null)}
-                    style={{ fontSize: 11, width: 'auto', padding: '0 6px', height: 22 }}
-                  >
-                    reset
-                  </button>
+                {s.isTiered ? (
+                  <span className="status-pill status-archived" style={{ fontSize: 11 }}>Tiered</span>
+                ) : (
+                  <>
+                    <div className="rate-input-wrap no-print">
+                      <span className="rate-prefix">{settings.currencySymbol}</span>
+                      <input
+                        className="rate-input mono"
+                        value={s.hasOverride ? String(s.rate) : (s.defaultRate || '')}
+                        placeholder={s.defaultRate ? String(s.defaultRate) : '0'}
+                        onChange={(e) => onRateChange(s.projectId, e.target.value)}
+                        inputMode="decimal"
+                        aria-label="Hourly rate for this month"
+                      />
+                    </div>
+                    <span className="print-only mono">
+                      {s.rate > 0 ? formatMoney(s.rate, settings.currencySymbol) : '—'}
+                    </span>
+                    {s.hasOverride && (
+                      <button
+                        className="iconbtn-ghost no-print"
+                        title={`Reset to default ${s.defaultRate ? formatMoney(s.defaultRate, settings.currencySymbol) : '—'}`}
+                        onClick={() => setRateOverride(monthKey, s.projectId, null)}
+                        style={{ fontSize: 11, width: 'auto', padding: '0 6px', height: 22 }}
+                      >
+                        reset
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               <div className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
@@ -469,6 +544,9 @@ function MonthDetail({
           const t = getTask(e.taskId);
           const seconds = entrySeconds(e);
           const override = monthOverrides[e.projectId];
+          // For per-entry display we still use a single display rate.
+          // Tiered amount is shown at the project level — per-entry amount falls
+          // back to default rate (or override) for transparency.
           const rate = override != null ? override : effectiveRate(p, client, undefined);
           const amount = secondsToHours(seconds) * rate;
           return (
@@ -483,7 +561,7 @@ function MonthDetail({
                   {t?.name || '(deleted)'}
                 </div>
               </div>
-              <div style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="entry-notes-cell">
                 {e.notes || '—'}
               </div>
               <div className="mono" style={{ textAlign: 'right', fontWeight: 500 }}>
@@ -507,6 +585,14 @@ function MonthDetail({
       </div>
 
       {editing !== undefined && <EntryModal entry={editing} onClose={() => setEditing(undefined)} />}
+      {showCreateInvoice && (
+        <CreateInvoiceModal
+          defaultClientId={clientId}
+          defaultMonthKey={monthKey}
+          onClose={() => setShowCreateInvoice(false)}
+          onCreated={(id) => { setShowCreateInvoice(false); onOpenInvoice(id); }}
+        />
+      )}
     </div>
   );
 }

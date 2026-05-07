@@ -156,3 +156,96 @@ export const effectiveRate = (
   if (client?.hourlyRate && client.hourlyRate > 0) return client.hourlyRate;
   return 0;
 };
+
+/** Round hours to 2 decimal places. */
+export const roundHours = (hours: number): number => Math.round(hours * 100) / 100;
+
+export interface TierSegment {
+  hours: number;
+  rate: number;
+  /** Inclusive lower bound of this segment (hours). */
+  fromHours: number;
+  /** Exclusive upper bound of this segment (hours), or null for "above". */
+  toHours: number | null;
+}
+
+/**
+ * Split `hours` across rate tiers. Tiers are processed in order; each tier's
+ * `uptoHours` is the cumulative cap. The last tier should omit `uptoHours`
+ * to mean "no cap" — anything left over flows there.
+ */
+export const splitHoursIntoTiers = (
+  hours: number,
+  tiers: { uptoHours?: number; rate: number }[]
+): TierSegment[] => {
+  if (!tiers || tiers.length === 0 || hours <= 0) return [];
+  const segments: TierSegment[] = [];
+  let consumed = 0;
+  let remaining = hours;
+  for (let i = 0; i < tiers.length; i++) {
+    if (remaining <= 0) break;
+    const tier = tiers[i];
+    const isLast = i === tiers.length - 1;
+    const cap = tier.uptoHours;
+    const capacity =
+      cap == null ? Infinity : Math.max(0, cap - consumed);
+    const takeRaw = isLast || cap == null ? remaining : Math.min(capacity, remaining);
+    const take = takeRaw;
+    if (take > 0) {
+      segments.push({
+        hours: take,
+        rate: tier.rate,
+        fromHours: consumed,
+        toHours: cap == null || isLast ? null : cap,
+      });
+      consumed += take;
+      remaining -= take;
+    } else if (capacity === 0 && !isLast) {
+      // tier exhausted, move on
+      continue;
+    }
+  }
+  return segments;
+};
+
+/**
+ * Compute the total billable amount for `hours` against tiers.
+ * Returns 0 if no tiers configured.
+ */
+export const computeTieredAmount = (
+  hours: number,
+  tiers: { uptoHours?: number; rate: number }[] | undefined
+): number => {
+  if (!tiers || tiers.length === 0) return 0;
+  return splitHoursIntoTiers(hours, tiers).reduce(
+    (acc, seg) => acc + seg.hours * seg.rate,
+    0
+  );
+};
+
+/** Pretty-print a tier segment range, e.g. "first 100 hrs", "over 100 hrs", "100-200 hrs". */
+export const describeTierSegment = (seg: TierSegment): string => {
+  const from = roundHours(seg.fromHours);
+  const to = seg.toHours == null ? null : roundHours(seg.toHours);
+  if (from === 0 && to != null) return `first ${to} hrs`;
+  if (to == null) return from > 0 ? `over ${from} hrs` : 'all hours';
+  return `hrs ${from}–${to}`;
+};
+
+/** Format a YYYY-MM-DD as e.g. "15 March 2026". */
+export const formatLongDateKey = (key: string): string => {
+  const d = parseDateKey(key);
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+/** Add days to a YYYY-MM-DD key, returning a new YYYY-MM-DD key. */
+export const addDaysToKey = (key: string, days: number): string =>
+  toDateKey(addDays(parseDateKey(key), days));
+
+/** Format the next invoice number using a prefix and a sequence integer. */
+export const formatInvoiceNumber = (prefix: string, n: number): string =>
+  `${prefix}${String(n).padStart(3, '0')}`;

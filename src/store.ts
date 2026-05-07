@@ -1,15 +1,48 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Client, Entry, Project, RateOverrides, Settings, Task } from './types';
-import { todayKey, uid } from './utils';
+import type {
+  Client,
+  Entry,
+  Invoice,
+  InvoiceLineItem,
+  InvoicingSettings,
+  Project,
+  RateOverrides,
+  Settings,
+  Task,
+} from './types';
+import {
+  addDaysToKey,
+  computeTieredAmount,
+  describeTierSegment,
+  effectiveRate,
+  entrySeconds,
+  formatInvoiceNumber,
+  monthKeyFromDateKey,
+  roundHours,
+  splitHoursIntoTiers,
+  todayKey,
+  uid,
+} from './utils';
 
 const DEFAULT_COLORS = ['#171717', '#0F5D3A', '#0068d6', '#7928ca', '#b45309', '#b91c1c', '#0891b2', '#db2777'];
+
+const DEFAULT_INVOICING: InvoicingSettings = {
+  from: {},
+  payment: {},
+  terms: 'Payment due within 7 days.',
+  numberPrefix: 'INV-',
+  nextNumber: 1,
+  defaultDueDays: 7,
+  defaultTaxRate: 0,
+};
 
 interface State {
   clients: Client[];
   projects: Project[];
   tasks: Task[];
   entries: Entry[];
+  invoices: Invoice[];
   rateOverrides: RateOverrides;
   settings: Settings;
 }
@@ -41,11 +74,20 @@ interface Actions {
   stopTimer: () => void;
   resumeEntry: (entryId: string) => void;
 
-  // Rate overrides (per-month, per-project)
+  // Rate overrides
   setRateOverride: (monthKey: string, projectId: string, rate: number | null) => void;
+
+  // Invoices
+  generateInvoiceFromMonth: (clientId: string, monthKey: string) => Invoice;
+  addInvoice: (data: Omit<Invoice, 'id' | 'number' | 'createdAt' | 'status'>) => Invoice;
+  updateInvoice: (id: string, data: Partial<Invoice>) => void;
+  finalizeInvoice: (id: string) => void;
+  reopenInvoice: (id: string) => void;
+  deleteInvoice: (id: string) => void;
 
   // Settings
   updateSettings: (data: Partial<Settings>) => void;
+  updateInvoicingSettings: (data: Partial<InvoicingSettings>) => void;
 
   // Data
   exportAll: () => string;
@@ -60,11 +102,13 @@ const initialState: State = {
   projects: [],
   tasks: [],
   entries: [],
+  invoices: [],
   rateOverrides: {},
   settings: {
     weekStart: 'mon',
     timeFormat: 'hhmm',
     currencySymbol: '$',
+    invoicing: DEFAULT_INVOICING,
   },
 };
 
@@ -73,8 +117,6 @@ export const DEFAULT_PROJECT_COLORS = DEFAULT_COLORS;
 /**
  * Legacy shape: projects used to carry `client: string` + `hourlyRate`.
  * Convert to clients[] entity + project.clientId.
- * Each distinct legacy client name (case-insensitive, trimmed) becomes one client.
- * Hourly rate on the legacy project is preserved as project.hourlyRate.
  */
 function migrateLegacyProjects(state: Partial<State>): Partial<State> {
   const legacyProjects = (state.projects ?? []) as Array<Project & { client?: string }>;
@@ -112,19 +154,35 @@ function migrateLegacyProjects(state: Partial<State>): Partial<State> {
   return { ...state, clients: newClients, projects: newProjects };
 }
 
+function normalizeSettings(s: Partial<Settings> | undefined): Settings {
+  const base = initialState.settings;
+  if (!s) return base;
+  return {
+    ...base,
+    ...s,
+    invoicing: {
+      ...DEFAULT_INVOICING,
+      ...(s.invoicing ?? {}),
+      from: { ...(s.invoicing?.from ?? {}) },
+      payment: { ...(s.invoicing?.payment ?? {}) },
+    },
+  };
+}
+
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       ...initialState,
 
       // ---------- Clients ----------
-      addClient: ({ name, color, hourlyRate, notes }) => {
+      addClient: ({ name, color, hourlyRate, notes, billing }) => {
         const c: Client = {
           id: uid(),
           name: name.trim(),
           color: color || DEFAULT_COLORS[0],
           hourlyRate: hourlyRate && hourlyRate > 0 ? hourlyRate : undefined,
           notes: notes?.trim() || undefined,
+          billing: billing && Object.values(billing).some((v) => v && String(v).trim()) ? billing : undefined,
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ clients: [...s.clients, c] }));
@@ -137,7 +195,6 @@ export const useStore = create<Store>()(
               ? {
                   ...c,
                   ...data,
-                  // normalize empty/zero rate to undefined
                   hourlyRate:
                     data.hourlyRate !== undefined
                       ? data.hourlyRate && data.hourlyRate > 0
@@ -158,7 +215,6 @@ export const useStore = create<Store>()(
               entries: s.entries.filter((e) => !projectIds.includes(e.projectId)),
             };
           }
-          // 'orphan' strategy: projects survive but lose their client — create a "Personal" fallback
           const fallback = s.clients.find((c) => c.name === 'Personal') ?? {
             id: uid(),
             name: 'Personal',
@@ -177,7 +233,7 @@ export const useStore = create<Store>()(
         }),
 
       // ---------- Projects ----------
-      addProject: ({ clientId, name, color, status, hourlyRate }) => {
+      addProject: ({ clientId, name, color, status, hourlyRate, rateTiers }) => {
         const p: Project = {
           id: uid(),
           clientId,
@@ -185,6 +241,7 @@ export const useStore = create<Store>()(
           color,
           status: status || 'active',
           hourlyRate: hourlyRate && hourlyRate > 0 ? hourlyRate : undefined,
+          rateTiers: rateTiers && rateTiers.length > 0 ? rateTiers : undefined,
           createdAt: new Date().toISOString(),
         };
         set((s) => ({ projects: [...s.projects, p] }));
@@ -203,6 +260,12 @@ export const useStore = create<Store>()(
                         ? data.hourlyRate
                         : undefined
                       : p.hourlyRate,
+                  rateTiers:
+                    data.rateTiers !== undefined
+                      ? data.rateTiers && data.rateTiers.length > 0
+                        ? data.rateTiers
+                        : undefined
+                      : p.rateTiers,
                 }
               : p
           ),
@@ -314,13 +377,162 @@ export const useStore = create<Store>()(
           return { rateOverrides: next };
         }),
 
-      updateSettings: (data) => set((s) => ({ settings: { ...s.settings, ...data } })),
+      // ---------- Invoices ----------
+      generateInvoiceFromMonth: (clientId, monthKey) => {
+        const state = get();
+        const client = state.clients.find((c) => c.id === clientId);
+        if (!client) throw new Error('Client not found');
+
+        const projects = state.projects.filter((p) => p.clientId === clientId);
+        const projectIdSet = new Set(projects.map((p) => p.id));
+        const monthEntries = state.entries.filter(
+          (e) => projectIdSet.has(e.projectId) && monthKeyFromDateKey(e.date) === monthKey
+        );
+
+        const projectSeconds = new Map<string, number>();
+        for (const e of monthEntries) {
+          const prev = projectSeconds.get(e.projectId) || 0;
+          projectSeconds.set(e.projectId, prev + entrySeconds(e));
+        }
+
+        const lineItems: InvoiceLineItem[] = [];
+        const sortedProjects = projects
+          .filter((p) => projectSeconds.has(p.id))
+          .sort((a, b) => (projectSeconds.get(b.id)! - projectSeconds.get(a.id)!));
+
+        for (const p of sortedProjects) {
+          const seconds = projectSeconds.get(p.id) || 0;
+          const hours = seconds / 3600;
+          const monthOverride = state.rateOverrides?.[monthKey]?.[p.id];
+
+          if (p.rateTiers && p.rateTiers.length > 0 && monthOverride == null) {
+            const segments = splitHoursIntoTiers(hours, p.rateTiers);
+            for (const seg of segments) {
+              if (seg.hours <= 0) continue;
+              lineItems.push({
+                id: uid(),
+                description: `${p.name} — ${describeTierSegment(seg)}`,
+                quantity: roundHours(seg.hours),
+                unitPrice: seg.rate,
+              });
+            }
+          } else {
+            const rate = monthOverride != null ? monthOverride : effectiveRate(p, client);
+            lineItems.push({
+              id: uid(),
+              description: p.name,
+              quantity: roundHours(hours),
+              unitPrice: rate,
+            });
+          }
+        }
+
+        const inv = state.settings.invoicing;
+        const issueDate = todayKey();
+        const dueDate = addDaysToKey(issueDate, inv.defaultDueDays || 0);
+        const number = formatInvoiceNumber(inv.numberPrefix || 'INV-', inv.nextNumber || 1);
+
+        const invoice: Invoice = {
+          id: uid(),
+          number,
+          status: 'draft',
+          issueDate,
+          dueDate,
+          clientId,
+          monthKey,
+          billFrom: { ...inv.from },
+          billTo: { ...(client.billing ?? {}) },
+          payment: { ...inv.payment },
+          lineItems,
+          taxRate: inv.defaultTaxRate || 0,
+          terms: inv.terms,
+          currencySymbol: state.settings.currencySymbol,
+          createdAt: new Date().toISOString(),
+        };
+
+        set((s) => ({
+          invoices: [...s.invoices, invoice],
+          settings: {
+            ...s.settings,
+            invoicing: {
+              ...s.settings.invoicing,
+              nextNumber: (s.settings.invoicing.nextNumber || 1) + 1,
+            },
+          },
+        }));
+        return invoice;
+      },
+
+      addInvoice: (data) => {
+        const state = get();
+        const inv = state.settings.invoicing;
+        const number = formatInvoiceNumber(inv.numberPrefix || 'INV-', inv.nextNumber || 1);
+        const invoice: Invoice = {
+          ...data,
+          id: uid(),
+          number,
+          status: 'draft',
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({
+          invoices: [...s.invoices, invoice],
+          settings: {
+            ...s.settings,
+            invoicing: {
+              ...s.settings.invoicing,
+              nextNumber: (s.settings.invoicing.nextNumber || 1) + 1,
+            },
+          },
+        }));
+        return invoice;
+      },
+      updateInvoice: (id, data) =>
+        set((s) => ({
+          invoices: s.invoices.map((inv) => (inv.id === id ? { ...inv, ...data } : inv)),
+        })),
+      finalizeInvoice: (id) =>
+        set((s) => ({
+          invoices: s.invoices.map((inv) =>
+            inv.id === id ? { ...inv, status: 'final', finalizedAt: new Date().toISOString() } : inv
+          ),
+        })),
+      reopenInvoice: (id) =>
+        set((s) => ({
+          invoices: s.invoices.map((inv) =>
+            inv.id === id ? { ...inv, status: 'draft', finalizedAt: undefined } : inv
+          ),
+        })),
+      deleteInvoice: (id) =>
+        set((s) => ({ invoices: s.invoices.filter((inv) => inv.id !== id) })),
+
+      updateSettings: (data) =>
+        set((s) => ({
+          settings: {
+            ...s.settings,
+            ...data,
+            invoicing: data.invoicing
+              ? { ...s.settings.invoicing, ...data.invoicing }
+              : s.settings.invoicing,
+          },
+        })),
+      updateInvoicingSettings: (data) =>
+        set((s) => ({
+          settings: {
+            ...s.settings,
+            invoicing: {
+              ...s.settings.invoicing,
+              ...data,
+              from: { ...s.settings.invoicing.from, ...(data.from ?? {}) },
+              payment: { ...s.settings.invoicing.payment, ...(data.payment ?? {}) },
+            },
+          },
+        })),
 
       // ---------- Data ----------
       exportAll: () => {
-        const { clients, projects, tasks, entries, rateOverrides, settings } = get();
+        const { clients, projects, tasks, entries, invoices, rateOverrides, settings } = get();
         return JSON.stringify(
-          { version: 3, clients, projects, tasks, entries, rateOverrides, settings },
+          { version: 4, clients, projects, tasks, entries, invoices, rateOverrides, settings },
           null,
           2
         );
@@ -329,12 +541,23 @@ export const useStore = create<Store>()(
         try {
           const parsed = JSON.parse(json);
           if (!parsed || typeof parsed !== 'object') throw new Error('Invalid data');
-          const { projects = [], tasks = [], entries = [], rateOverrides, settings } = parsed;
+          const {
+            projects = [],
+            tasks = [],
+            entries = [],
+            invoices = [],
+            rateOverrides,
+            settings,
+          } = parsed;
           let { clients = [] } = parsed;
-          if (!Array.isArray(projects) || !Array.isArray(tasks) || !Array.isArray(entries)) {
+          if (
+            !Array.isArray(projects) ||
+            !Array.isArray(tasks) ||
+            !Array.isArray(entries) ||
+            !Array.isArray(invoices)
+          ) {
             throw new Error('Missing required arrays');
           }
-          // Migrate legacy projects if needed
           const migrated = migrateLegacyProjects({ clients, projects });
           clients = migrated.clients ?? clients;
           const newProjects = migrated.projects ?? projects;
@@ -343,8 +566,9 @@ export const useStore = create<Store>()(
             projects: newProjects,
             tasks,
             entries,
+            invoices,
             rateOverrides: rateOverrides && typeof rateOverrides === 'object' ? rateOverrides : {},
-            settings: { ...initialState.settings, ...(settings || {}) },
+            settings: normalizeSettings(settings),
           });
           return { ok: true };
         } catch (e) {
@@ -355,11 +579,8 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'tracker:v1',
-      version: 3,
-      migrate: (persisted) => {
-        // We rely on `merge` below to reshape legacy data, so pass through as-is.
-        return persisted as State;
-      },
+      version: 4,
+      migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const migrated = migrateLegacyProjects({
@@ -371,8 +592,9 @@ export const useStore = create<Store>()(
           ...p,
           clients: migrated.clients ?? p.clients ?? [],
           projects: migrated.projects ?? p.projects ?? [],
+          invoices: p.invoices ?? [],
           rateOverrides: p.rateOverrides ?? {},
-          settings: { ...current.settings, ...(p.settings ?? {}) },
+          settings: normalizeSettings(p.settings),
         };
       },
     }
@@ -393,4 +615,19 @@ export const seedIfEmpty = () => {
   if (tasks.length === 0) {
     ['Development', 'Design', 'Research', 'Meetings', 'Writing'].forEach((name) => addTask(name));
   }
+};
+
+/** Helpers used by the report views to compute consistent earnings. */
+export const computeProjectMonthAmount = (
+  hours: number,
+  project: Project | undefined,
+  client: Client | undefined,
+  monthOverride: number | undefined
+): number => {
+  if (monthOverride != null) return hours * monthOverride;
+  if (project?.rateTiers && project.rateTiers.length > 0) {
+    return computeTieredAmount(hours, project.rateTiers);
+  }
+  const rate = effectiveRate(project, client, undefined);
+  return hours * rate;
 };

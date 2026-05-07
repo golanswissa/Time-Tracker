@@ -5,6 +5,7 @@ const items: { id: Route; label: string }[] = [
   { id: 'clients', label: 'Clients' },
   { id: 'projects', label: 'Projects' },
   { id: 'reports', label: 'Reports' },
+  { id: 'invoices', label: 'Invoices' },
   { id: 'tasks', label: 'Tasks' },
 ];
 

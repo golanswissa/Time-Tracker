@@ -4,6 +4,7 @@ import { useStore } from '../store';
 export function SettingsPage() {
   const settings = useStore((s) => s.settings);
   const updateSettings = useStore((s) => s.updateSettings);
+  const updateInvoicingSettings = useStore((s) => s.updateInvoicingSettings);
   const exportAll = useStore((s) => s.exportAll);
   const importAll = useStore((s) => s.importAll);
   const clearAll = useStore((s) => s.clearAll);
@@ -34,7 +35,6 @@ export function SettingsPage() {
     } else {
       setMsg({ kind: 'err', text: `Import failed: ${result.error}` });
     }
-    // reset input so the same file can be re-chosen
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -44,6 +44,8 @@ export function SettingsPage() {
       setMsg({ kind: 'ok', text: 'All data cleared.' });
     }
   };
+
+  const inv = settings.invoicing;
 
   return (
     <div className="page">
@@ -77,12 +79,172 @@ export function SettingsPage() {
       </div>
 
       <div className="settings-section">
+        <h2>Invoicing</h2>
+        <p className="desc">Used as defaults whenever you generate an invoice. Each invoice snapshots these at creation.</p>
+
+        <div className="stack" style={{ gap: 14, marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginTop: 8 }}>
+            From (your details)
+          </div>
+          <div className="modal-row">
+            <div className="field">
+              <label>Name</label>
+              <input
+                className="input"
+                placeholder="e.g. Maya Solomon Swissa"
+                value={inv.from.name || ''}
+                onChange={(e) => updateInvoicingSettings({ from: { name: e.target.value } })}
+              />
+            </div>
+            <div className="field">
+              <label>Email</label>
+              <input
+                className="input"
+                placeholder="you@example.com"
+                value={inv.from.email || ''}
+                onChange={(e) => updateInvoicingSettings({ from: { email: e.target.value } })}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label>Address</label>
+            <textarea
+              className="textarea"
+              placeholder={'Street\nCity, Postcode\nCountry'}
+              value={inv.from.address || ''}
+              onChange={(e) => updateInvoicingSettings({ from: { address: e.target.value } })}
+            />
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginTop: 8 }}>
+            Payment details
+          </div>
+          <div className="modal-row">
+            <div className="field">
+              <label>Bank name</label>
+              <input
+                className="input"
+                value={inv.payment.bankName || ''}
+                onChange={(e) => updateInvoicingSettings({ payment: { bankName: e.target.value } })}
+              />
+            </div>
+            <div className="field">
+              <label>Account name</label>
+              <input
+                className="input"
+                value={inv.payment.accountName || ''}
+                onChange={(e) => updateInvoicingSettings({ payment: { accountName: e.target.value } })}
+              />
+            </div>
+          </div>
+          <div className="modal-row">
+            <div className="field">
+              <label>Account number</label>
+              <input
+                className="input mono"
+                value={inv.payment.accountNumber || ''}
+                onChange={(e) => updateInvoicingSettings({ payment: { accountNumber: e.target.value } })}
+              />
+            </div>
+            <div className="field">
+              <label>BSB / Routing</label>
+              <input
+                className="input mono"
+                value={inv.payment.bsb || ''}
+                onChange={(e) => updateInvoicingSettings({ payment: { bsb: e.target.value } })}
+              />
+            </div>
+          </div>
+          <div className="modal-row">
+            <div className="field">
+              <label>SWIFT</label>
+              <input
+                className="input mono"
+                value={inv.payment.swift || ''}
+                onChange={(e) => updateInvoicingSettings({ payment: { swift: e.target.value } })}
+              />
+            </div>
+            <div className="field">
+              <label>Bank address</label>
+              <input
+                className="input"
+                value={inv.payment.bankAddress || ''}
+                onChange={(e) => updateInvoicingSettings({ payment: { bankAddress: e.target.value } })}
+              />
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', marginTop: 8 }}>
+            Defaults
+          </div>
+          <div className="modal-row">
+            <div className="field">
+              <label>Number prefix</label>
+              <input
+                className="input"
+                placeholder="INV-"
+                value={inv.numberPrefix}
+                onChange={(e) => updateInvoicingSettings({ numberPrefix: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <label>Next number</label>
+              <input
+                className="input mono"
+                value={String(inv.nextNumber)}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!isNaN(n) && n >= 1) updateInvoicingSettings({ nextNumber: Math.floor(n) });
+                }}
+                inputMode="numeric"
+              />
+            </div>
+          </div>
+          <div className="modal-row">
+            <div className="field">
+              <label>Default due (days)</label>
+              <input
+                className="input mono"
+                value={String(inv.defaultDueDays)}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!isNaN(n) && n >= 0) updateInvoicingSettings({ defaultDueDays: Math.floor(n) });
+                }}
+                inputMode="numeric"
+              />
+            </div>
+            <div className="field">
+              <label>Default tax rate (%)</label>
+              <input
+                className="input mono"
+                value={String(inv.defaultTaxRate)}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!isNaN(n) && n >= 0) updateInvoicingSettings({ defaultTaxRate: n });
+                }}
+                inputMode="decimal"
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label>Payment terms</label>
+            <input
+              className="input"
+              placeholder="Payment due within 7 days."
+              value={inv.terms || ''}
+              onChange={(e) => updateInvoicingSettings({ terms: e.target.value })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
         <h2>Data</h2>
         <p className="desc">Everything is stored locally in your browser. Back it up regularly.</p>
         <div className="settings-row">
           <div>
             <div className="label">Export all data</div>
-            <div className="sub">Downloads a JSON backup of projects, tasks, entries, and settings.</div>
+            <div className="sub">Downloads a JSON backup of clients, projects, entries, invoices, and settings.</div>
           </div>
           <button className="btn" onClick={handleExport}>Export JSON</button>
         </div>
@@ -123,14 +285,16 @@ export function SettingsPage() {
         <h2>Keyboard</h2>
         <p className="desc">Available shortcuts.</p>
         <div className="settings-row">
-          <div>
-            <div className="label">Go to Time</div>
-          </div>
+          <div><div className="label">Go to Time</div></div>
           <div><span className="kbd">G</span> then <span className="kbd">T</span></div>
         </div>
         <div className="settings-row">
-          <div><div className="label">Go to Week</div></div>
-          <div><span className="kbd">G</span> then <span className="kbd">W</span></div>
+          <div><div className="label">Go to Reports</div></div>
+          <div><span className="kbd">G</span> then <span className="kbd">R</span></div>
+        </div>
+        <div className="settings-row">
+          <div><div className="label">Go to Invoices</div></div>
+          <div><span className="kbd">G</span> then <span className="kbd">I</span></div>
         </div>
         <div className="settings-row">
           <div><div className="label">Go to Projects</div></div>
