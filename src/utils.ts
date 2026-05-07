@@ -242,6 +242,14 @@ export const formatLongDateKey = (key: string): string => {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 
+/** Format a YYYY-MM-DD as DD/MM/YYYY (e.g. "07/05/2026"). Used on the invoice. */
+export const formatDDMMYYYY = (key: string): string => {
+  const d = parseDateKey(key);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${d.getFullYear()}`;
+};
+
 /** Add days to a YYYY-MM-DD key, returning a new YYYY-MM-DD key. */
 export const addDaysToKey = (key: string, days: number): string =>
   toDateKey(addDays(parseDateKey(key), days));

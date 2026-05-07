@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Printer, Trash2, Lock, Unlock } from 'lucide-react';
 import { useStore } from '../store';
 import type { Invoice, InvoiceLineItem } from '../types';
-import { formatLongDateKey, formatMoney, uid } from '../utils';
+import { formatDDMMYYYY, formatMoney, uid } from '../utils';
 
 interface Props {
   invoiceId: string;
@@ -76,6 +76,8 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
     }
   };
 
+  const totalDisplay = `${formatMoney(total, symbol)} USD`;
+
   return (
     <div className="page invoice-page">
       <div className="topbar no-print">
@@ -118,37 +120,37 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
         </div>
       </div>
 
-      {/* ---------- Invoice document ---------- */}
+      {/* ---------- Invoice document (matches Figma 2:89) ---------- */}
       <div className="invoice-doc">
-        <header className="invoice-header">
-          <div className="invoice-header-left">
-            <EditableText
-              className="invoice-from-name"
-              value={invoice.billFrom.name || ''}
-              placeholder="Your name"
-              disabled={!isDraft}
-              onChange={(v) => onPatch({ billFrom: { ...invoice.billFrom, name: v } })}
-            />
-          </div>
-          <div className="invoice-header-right">
-            <div className="invoice-title">INVOICE</div>
-            <div className="invoice-meta">
-              <div><span className="meta-label">Invoice Number:</span>
-                <EditableText
-                  className="meta-value"
+        <header className="inv-top">
+          <EditableInline
+            className="inv-from-name"
+            value={invoice.billFrom.name || ''}
+            placeholder="Your name"
+            disabled={!isDraft}
+            onChange={(v) => onPatch({ billFrom: { ...invoice.billFrom, name: v } })}
+          />
+          <div className="inv-meta-block">
+            <div className="inv-title">INVOICE</div>
+            <div className="inv-meta">
+              <div className="inv-meta-row">
+                <span>Invoice Number:&nbsp;</span>
+                <EditableInline
                   value={invoice.number}
                   disabled={!isDraft}
                   onChange={(v) => onPatch({ number: v })}
                 />
               </div>
-              <div><span className="meta-label">Issue Date:</span>
+              <div className="inv-meta-row">
+                <span>Issue Date:&nbsp;</span>
                 <EditableDate
                   value={invoice.issueDate}
                   disabled={!isDraft}
                   onChange={(v) => onPatch({ issueDate: v })}
                 />
               </div>
-              <div><span className="meta-label">Due Date:</span>
+              <div className="inv-meta-row">
+                <span>Due Date:&nbsp;</span>
                 <EditableDate
                   value={invoice.dueDate}
                   disabled={!isDraft}
@@ -159,77 +161,82 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
           </div>
         </header>
 
-        <section className="invoice-parties">
+        <section className="inv-parties">
           <div>
-            <div className="invoice-section-label">From</div>
-            <EditableText
-              className="party-name"
+            <div className="inv-section-label">From</div>
+            <EditableInline
+              className="inv-party-line"
               value={invoice.billFrom.name || ''}
               placeholder="Your name"
               disabled={!isDraft}
               onChange={(v) => onPatch({ billFrom: { ...invoice.billFrom, name: v } })}
             />
             <EditableArea
-              className="party-address"
+              className="inv-party-block"
               value={invoice.billFrom.address || ''}
               placeholder={'Street\nCity, Postcode\nCountry'}
               disabled={!isDraft}
               onChange={(v) => onPatch({ billFrom: { ...invoice.billFrom, address: v } })}
             />
-            <EditableText
-              className="party-email"
-              value={invoice.billFrom.email ? `Email: ${invoice.billFrom.email}` : ''}
-              placeholder="Email: you@example.com"
-              disabled={!isDraft}
-              onChange={(v) => onPatch({
-                billFrom: { ...invoice.billFrom, email: v.replace(/^Email:\s*/i, '').trim() },
-              })}
-            />
+            {(isDraft || invoice.billFrom.email) && (
+              <div className="inv-party-line inv-party-spacer">
+                <span>Email:&nbsp;</span>
+                <EditableInline
+                  value={invoice.billFrom.email || ''}
+                  placeholder="you@example.com"
+                  disabled={!isDraft}
+                  onChange={(v) => onPatch({ billFrom: { ...invoice.billFrom, email: v } })}
+                />
+              </div>
+            )}
           </div>
           <div>
-            <div className="invoice-section-label">Bill To</div>
-            <EditableText
-              className="party-name"
+            <div className="inv-section-label">Bill To</div>
+            <EditableInline
+              className="inv-party-line"
               value={invoice.billTo.companyName || ''}
               placeholder={client?.name || 'Company name'}
               disabled={!isDraft}
               onChange={(v) => onPatch({ billTo: { ...invoice.billTo, companyName: v } })}
             />
-            <EditableText
-              className="party-address"
-              value={invoice.billTo.contactName ? `Client Contact Name: ${invoice.billTo.contactName}` : ''}
-              placeholder="Client Contact Name: …"
-              disabled={!isDraft}
-              onChange={(v) => onPatch({
-                billTo: { ...invoice.billTo, contactName: v.replace(/^Client Contact Name:\s*/i, '').trim() },
-              })}
-            />
+            {(isDraft || invoice.billTo.contactName) && (
+              <div className="inv-party-line">
+                <span>Client Contact Name:&nbsp;</span>
+                <EditableInline
+                  value={invoice.billTo.contactName || ''}
+                  placeholder="Contact name"
+                  disabled={!isDraft}
+                  onChange={(v) => onPatch({ billTo: { ...invoice.billTo, contactName: v } })}
+                />
+              </div>
+            )}
             <EditableArea
-              className="party-address"
+              className="inv-party-block"
               value={invoice.billTo.address || ''}
               placeholder={'Address line 1\nAddress line 2'}
               disabled={!isDraft}
               onChange={(v) => onPatch({ billTo: { ...invoice.billTo, address: v } })}
             />
-            {invoice.billTo.email && (
-              <EditableText
-                className="party-email"
-                value={`Email: ${invoice.billTo.email}`}
-                disabled={!isDraft}
-                onChange={(v) => onPatch({
-                  billTo: { ...invoice.billTo, email: v.replace(/^Email:\s*/i, '').trim() },
-                })}
-              />
+            {(isDraft || invoice.billTo.email) && (
+              <div className="inv-party-line">
+                <span>Email:&nbsp;</span>
+                <EditableInline
+                  value={invoice.billTo.email || ''}
+                  placeholder=""
+                  disabled={!isDraft}
+                  onChange={(v) => onPatch({ billTo: { ...invoice.billTo, email: v } })}
+                />
+              </div>
             )}
           </div>
         </section>
 
-        <section className="invoice-items">
-          <div className="items-head">
+        <section className="inv-items">
+          <div className="inv-items-head">
             <div>Description</div>
-            <div style={{ textAlign: 'right' }}>Quantity</div>
-            <div style={{ textAlign: 'right' }}>Unit Price</div>
-            <div style={{ textAlign: 'right' }}>Total</div>
+            <div className="ralign">Quantity</div>
+            <div className="ralign">Unit Price</div>
+            <div className="ralign">Total</div>
             <div className="no-print" />
           </div>
           {invoice.lineItems.length === 0 && (
@@ -238,32 +245,32 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
             </div>
           )}
           {invoice.lineItems.map((li, idx) => (
-            <div key={li.id} className="items-row">
-              <EditableText
-                className="li-desc"
+            <div key={li.id} className="inv-items-row">
+              <EditableInline
+                className="inv-li-desc"
                 value={li.description}
                 placeholder="Description"
                 disabled={!isDraft}
                 onChange={(v) => onItemChange(idx, { description: v })}
               />
               <EditableNumber
-                className="li-num"
+                className="ralign"
                 value={li.quantity}
                 disabled={!isDraft}
                 onChange={(v) => onItemChange(idx, { quantity: v })}
-                placeholder="0"
               />
               <EditableMoney
-                className="li-num"
+                className="ralign"
                 value={li.unitPrice}
                 disabled={!isDraft}
                 symbol={symbol}
                 onChange={(v) => onItemChange(idx, { unitPrice: v })}
+                short
               />
-              <div className="li-num mono" style={{ fontWeight: 500 }}>
+              <div className="ralign">
                 {formatMoney(li.quantity * li.unitPrice, symbol)}
               </div>
-              <div className="no-print" style={{ textAlign: 'right' }}>
+              <div className="no-print inv-li-actions">
                 {isDraft && (
                   <button
                     className="iconbtn-ghost"
@@ -283,65 +290,77 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
           )}
         </section>
 
-        <section className="invoice-totals">
-          <div className="totals-row">
-            <div>Subtotal:</div>
-            <div className="mono">{formatMoney(subtotal, symbol)}</div>
-          </div>
-          <div className="totals-row">
-            <div>
-              Tax{isDraft ? (
-                <>
-                  {' '}(
-                  <input
-                    className="hrs-input"
-                    style={{ width: 56, textAlign: 'right' }}
-                    value={String(invoice.taxRate || 0)}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      if (!isNaN(n) && n >= 0) onPatch({ taxRate: n });
-                    }}
-                    inputMode="decimal"
-                  />%):
-                </>
-              ) : (
-                <> ({invoice.taxRate || 0}%):</>
-              )}
+        <section className="inv-totals">
+          <div className="inv-totals-panel">
+            <div className="inv-totals-row">
+              <span>Subtotal:</span>
+              <span>{formatMoney(subtotal, symbol)}</span>
             </div>
-            <div className="mono">{formatMoney(tax, symbol)}</div>
-          </div>
-          <div className="totals-row total-final">
-            <div>Total:</div>
-            <div className="mono">{formatMoney(total, symbol)}</div>
+            <div className="inv-totals-row">
+              <span>
+                Tax{isDraft ? (
+                  <>
+                    {' '}(
+                    <input
+                      className="hrs-input inv-tax-input"
+                      value={String(invoice.taxRate || 0)}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!isNaN(n) && n >= 0) onPatch({ taxRate: n });
+                      }}
+                      inputMode="decimal"
+                    />%):
+                  </>
+                ) : (
+                  invoice.taxRate ? <> ({invoice.taxRate}%):</> : ':'
+                )}
+              </span>
+              <span>{tax > 0 ? formatMoney(tax, symbol) : `${symbol}0`}</span>
+            </div>
+            <div className="inv-totals-row inv-totals-final">
+              <span>Total:</span>
+              <span>{totalDisplay}</span>
+            </div>
           </div>
         </section>
 
-        <section className="invoice-payment">
-          <div className="invoice-section-label">Payment Details</div>
-          <PaymentRow label="Bank Name" value={invoice.payment.bankName || ''} disabled={!isDraft}
-            onChange={(v) => onPatch({ payment: { ...invoice.payment, bankName: v } })} />
-          <PaymentRow label="Account Name" value={invoice.payment.accountName || ''} disabled={!isDraft}
-            onChange={(v) => onPatch({ payment: { ...invoice.payment, accountName: v } })} />
-          <PaymentRow label="Account Number" value={invoice.payment.accountNumber || ''} disabled={!isDraft} mono
-            onChange={(v) => onPatch({ payment: { ...invoice.payment, accountNumber: v } })} />
-          <PaymentRow label="BSB" value={invoice.payment.bsb || ''} disabled={!isDraft} mono
-            onChange={(v) => onPatch({ payment: { ...invoice.payment, bsb: v } })} />
-          <PaymentRow label="SWIFT" value={invoice.payment.swift || ''} disabled={!isDraft} mono
-            onChange={(v) => onPatch({ payment: { ...invoice.payment, swift: v } })} />
-          <PaymentRow label="Bank Address" value={invoice.payment.bankAddress || ''} disabled={!isDraft}
-            onChange={(v) => onPatch({ payment: { ...invoice.payment, bankAddress: v } })} />
+        <section className="inv-payment">
+          <div className="inv-section-label">Payment Details</div>
+          <div className="inv-payment-list">
+            <PaymentLine label="Bank Name" value={invoice.payment.bankName || ''} disabled={!isDraft}
+              onChange={(v) => onPatch({ payment: { ...invoice.payment, bankName: v } })} />
+            <PaymentLine label="Account Name" value={invoice.payment.accountName || ''} disabled={!isDraft}
+              onChange={(v) => onPatch({ payment: { ...invoice.payment, accountName: v } })} />
+            <PaymentLine label="Account Number" value={invoice.payment.accountNumber || ''} disabled={!isDraft}
+              onChange={(v) => onPatch({ payment: { ...invoice.payment, accountNumber: v } })} />
+            <PaymentLine label="BSB" value={invoice.payment.bsb || ''} disabled={!isDraft}
+              onChange={(v) => onPatch({ payment: { ...invoice.payment, bsb: v } })} />
+            {(isDraft || invoice.payment.bankAddress) && (
+              <PaymentLine label="Bank Address" value={invoice.payment.bankAddress || ''} disabled={!isDraft}
+                onChange={(v) => onPatch({ payment: { ...invoice.payment, bankAddress: v } })} />
+            )}
+            {(isDraft || invoice.payment.swift) && (
+              <PaymentLine label="SWIFT" value={invoice.payment.swift || ''} disabled={!isDraft}
+                onChange={(v) => onPatch({ payment: { ...invoice.payment, swift: v } })} />
+            )}
+          </div>
         </section>
 
-        <section className="invoice-terms">
-          <EditableText
-            className="invoice-terms-line"
-            value={invoice.terms ? `Payment Terms: ${invoice.terms}` : ''}
-            placeholder="Payment Terms: Payment due within 7 days."
-            disabled={!isDraft}
-            onChange={(v) => onPatch({ terms: v.replace(/^Payment Terms:\s*/i, '').trim() })}
-          />
-          <div className="invoice-thanks">Thank you for your business.</div>
+        <section className="inv-terms">
+          <div className="inv-terms-line">
+            <span>Payment Terms:&nbsp;</span>
+            <EditableInline
+              value={invoice.terms || ''}
+              placeholder="Payment due within 7 days."
+              disabled={!isDraft}
+              onChange={(v) => onPatch({ terms: v })}
+            />
+          </div>
         </section>
+
+        <footer className="inv-thanks">
+          <p>Thank you for your business.</p>
+        </footer>
       </div>
 
       {invoice.status === 'final' && (
@@ -352,25 +371,21 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
           This invoice is finalized. Click <strong>Reopen</strong> if you need to make further edits.
         </div>
       )}
-
-      {/* Date display string used by print, not editable */}
-      <span className="print-only" aria-hidden style={{ display: 'none' }}>
-        {formatLongDateKey(invoice.issueDate)} · {formatLongDateKey(invoice.dueDate)}
-      </span>
     </div>
   );
 }
 
 /* ---------------- editable primitives ---------------- */
 
-function EditableText({
+/** Inline input that hides its chrome until hover/focus, so the doc reads as plain text. */
+function EditableInline({
   value, onChange, placeholder, disabled, className,
 }: {
   value: string; onChange: (v: string) => void; placeholder?: string;
   disabled?: boolean; className?: string;
 }) {
   if (disabled) {
-    return <div className={className}>{value || placeholder || ''}</div>;
+    return <span className={className}>{value || placeholder || ''}</span>;
   }
   return (
     <input
@@ -389,7 +404,9 @@ function EditableArea({
   disabled?: boolean; className?: string;
 }) {
   if (disabled) {
-    return <div className={className} style={{ whiteSpace: 'pre-line' }}>{value || ''}</div>;
+    return value
+      ? <div className={className} style={{ whiteSpace: 'pre-line' }}>{value}</div>
+      : null;
   }
   return (
     <textarea
@@ -403,20 +420,18 @@ function EditableArea({
 }
 
 function EditableNumber({
-  value, onChange, placeholder, disabled, className,
+  value, onChange, disabled, className,
 }: {
-  value: number; onChange: (v: number) => void; placeholder?: string;
-  disabled?: boolean; className?: string;
+  value: number; onChange: (v: number) => void; disabled?: boolean; className?: string;
 }) {
   const [text, setText] = useState<string>(String(value));
   if (disabled) {
-    return <div className={`mono ${className || ''}`}>{value}</div>;
+    return <span className={className}>{value}</span>;
   }
   return (
     <input
-      className={`inv-input mono ${className || ''}`}
+      className={`inv-input ${className || ''}`}
       value={text}
-      placeholder={placeholder}
       onChange={(e) => {
         setText(e.target.value);
         const n = Number(e.target.value);
@@ -424,40 +439,36 @@ function EditableNumber({
       }}
       onBlur={() => setText(String(value))}
       inputMode="decimal"
-      style={{ textAlign: 'right' }}
     />
   );
 }
 
 function EditableMoney({
-  value, onChange, disabled, symbol, className,
+  value, onChange, disabled, symbol, className, short,
 }: {
   value: number; onChange: (v: number) => void; disabled?: boolean;
-  symbol: string; className?: string;
+  symbol: string; className?: string; short?: boolean;
 }) {
   const [text, setText] = useState<string>(String(value));
   if (disabled) {
-    return <div className={`mono ${className || ''}`}>{formatMoney(value, symbol)}</div>;
+    return (
+      <span className={className}>
+        {short ? `${symbol}${value}` : formatMoney(value, symbol)}
+      </span>
+    );
   }
   return (
-    <div className={className} style={{ position: 'relative', display: 'flex', justifyContent: 'flex-end' }}>
-      <span style={{
-        position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-        color: 'var(--text-muted)', fontSize: 13,
-      }}>{symbol}</span>
-      <input
-        className="inv-input mono"
-        style={{ paddingLeft: 22, textAlign: 'right' }}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          const n = Number(e.target.value);
-          if (!isNaN(n) && n >= 0) onChange(n);
-        }}
-        onBlur={() => setText(String(value))}
-        inputMode="decimal"
-      />
-    </div>
+    <input
+      className={`inv-input ${className || ''}`}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = Number(e.target.value);
+        if (!isNaN(n) && n >= 0) onChange(n);
+      }}
+      onBlur={() => setText(String(value))}
+      inputMode="decimal"
+    />
   );
 }
 
@@ -467,34 +478,27 @@ function EditableDate({
   value: string; onChange: (v: string) => void; disabled?: boolean;
 }) {
   if (disabled) {
-    return <span className="meta-value">{formatLongDateKey(value)}</span>;
+    return <span>{formatDDMMYYYY(value)}</span>;
   }
   return (
     <input
       type="date"
-      className="inv-input mono"
+      className="inv-input inv-date-input"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      style={{ width: 150 }}
     />
   );
 }
 
-function PaymentRow({
-  label, value, onChange, disabled, mono,
+function PaymentLine({
+  label, value, onChange, disabled,
 }: {
-  label: string; value: string; onChange: (v: string) => void;
-  disabled?: boolean; mono?: boolean;
+  label: string; value: string; onChange: (v: string) => void; disabled?: boolean;
 }) {
   return (
-    <div className="payment-row">
-      <span className="payment-label">{label}:</span>
-      <EditableText
-        className={`payment-value ${mono ? 'mono' : ''}`}
-        value={value}
-        disabled={disabled}
-        onChange={onChange}
-      />
+    <div className="inv-payment-line">
+      <span>{label}:&nbsp;</span>
+      <EditableInline value={value} disabled={disabled} onChange={onChange} />
     </div>
   );
 }
