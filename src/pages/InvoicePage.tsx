@@ -21,6 +21,13 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
   const clients = useStore((s) => s.clients);
   const [savedDefaults, setSavedDefaults] = useState(false);
 
+  // All hooks must run before any early return — guard against a missing
+  // invoice (e.g. immediately after it's deleted) so the hook order stays stable.
+  const subtotal = useMemo(
+    () => (invoice?.lineItems ?? []).reduce((acc, li) => acc + li.quantity * li.unitPrice, 0),
+    [invoice]
+  );
+
   if (!invoice) {
     return (
       <div className="page">
@@ -38,10 +45,6 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
   const isDraft = invoice.status === 'draft';
   const symbol = invoice.currencySymbol || '$';
 
-  const subtotal = useMemo(
-    () => invoice.lineItems.reduce((acc, li) => acc + li.quantity * li.unitPrice, 0),
-    [invoice.lineItems]
-  );
   const tax = subtotal * (invoice.taxRate || 0) / 100;
   const total = subtotal + tax;
 

@@ -399,20 +399,19 @@ export const useStore = create<Store>()(
         }));
       },
       resumeEntry: (entryId) => {
+        // Resume the SAME entry in place: stop any other running timer (so only
+        // one runs at a time), then continue accumulating into this entry —
+        // keeping its existing duration. Pause/resume no longer forks new rows.
         get().stopTimer();
-        const src = get().entries.find((e) => e.id === entryId);
-        if (!src) return;
-        const newEntry: Entry = {
-          id: uid(),
-          projectId: src.projectId,
-          taskId: src.taskId,
-          notes: src.notes,
-          date: todayKey(),
-          durationSeconds: 0,
-          isRunning: true,
-          startedAt: new Date().toISOString(),
-        };
-        set((s) => ({ entries: [...s.entries, newEntry] }));
+        const target = get().entries.find((e) => e.id === entryId);
+        if (!target || target.isRunning) return;
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === entryId
+              ? { ...e, isRunning: true, startedAt: new Date().toISOString() }
+              : e
+          ),
+        }));
       },
 
       // ---------- Rate overrides ----------
