@@ -79,6 +79,8 @@ interface Actions {
 
   // Invoices
   generateInvoiceFromMonth: (clientId: string, monthKey: string) => Invoice;
+  /** Rebuild a month-linked draft invoice's line items from current time entries + rates. */
+  regenerateInvoiceFromMonth: (invoiceId: string) => void;
   addInvoice: (data: Omit<Invoice, 'id' | 'number' | 'createdAt' | 'status'>) => Invoice;
   updateInvoice: (id: string, data: Partial<Invoice>) => void;
   finalizeInvoice: (id: string) => void;
@@ -167,6 +169,61 @@ function normalizeSettings(s: Partial<Settings> | undefined): Settings {
       payment: { ...(s.invoicing?.payment ?? {}) },
     },
   };
+}
+
+/**
+ * Build invoice line items for one client-month from time entries.
+ * Tiered projects split into one line per tier segment (e.g. first 100 hrs @ $100,
+ * then $80 above); flat projects produce a single line. A month rate override on a
+ * project takes precedence over its tiers. Shared by invoice creation + regeneration.
+ */
+function buildMonthLineItems(
+  client: Client,
+  clientProjects: Project[],
+  entries: Entry[],
+  rateOverrides: RateOverrides,
+  monthKey: string
+): InvoiceLineItem[] {
+  const projectIdSet = new Set(clientProjects.map((p) => p.id));
+  const monthEntries = entries.filter(
+    (e) => projectIdSet.has(e.projectId) && monthKeyFromDateKey(e.date) === monthKey
+  );
+
+  const projectSeconds = new Map<string, number>();
+  for (const e of monthEntries) {
+    projectSeconds.set(e.projectId, (projectSeconds.get(e.projectId) || 0) + entrySeconds(e));
+  }
+
+  const lineItems: InvoiceLineItem[] = [];
+  const sortedProjects = clientProjects
+    .filter((p) => projectSeconds.has(p.id))
+    .sort((a, b) => (projectSeconds.get(b.id)! - projectSeconds.get(a.id)!));
+
+  for (const p of sortedProjects) {
+    const hours = (projectSeconds.get(p.id) || 0) / 3600;
+    const monthOverride = rateOverrides?.[monthKey]?.[p.id];
+
+    if (p.rateTiers && p.rateTiers.length > 0 && monthOverride == null) {
+      for (const seg of splitHoursIntoTiers(hours, p.rateTiers)) {
+        if (seg.hours <= 0) continue;
+        lineItems.push({
+          id: uid(),
+          description: `${p.name} — ${describeTierSegment(seg)}`,
+          quantity: roundHours(seg.hours),
+          unitPrice: seg.rate,
+        });
+      }
+    } else {
+      const rate = monthOverride != null ? monthOverride : effectiveRate(p, client);
+      lineItems.push({
+        id: uid(),
+        description: p.name,
+        quantity: roundHours(hours),
+        unitPrice: rate,
+      });
+    }
+  }
+  return lineItems;
 }
 
 export const useStore = create<Store>()(
@@ -384,48 +441,7 @@ export const useStore = create<Store>()(
         if (!client) throw new Error('Client not found');
 
         const projects = state.projects.filter((p) => p.clientId === clientId);
-        const projectIdSet = new Set(projects.map((p) => p.id));
-        const monthEntries = state.entries.filter(
-          (e) => projectIdSet.has(e.projectId) && monthKeyFromDateKey(e.date) === monthKey
-        );
-
-        const projectSeconds = new Map<string, number>();
-        for (const e of monthEntries) {
-          const prev = projectSeconds.get(e.projectId) || 0;
-          projectSeconds.set(e.projectId, prev + entrySeconds(e));
-        }
-
-        const lineItems: InvoiceLineItem[] = [];
-        const sortedProjects = projects
-          .filter((p) => projectSeconds.has(p.id))
-          .sort((a, b) => (projectSeconds.get(b.id)! - projectSeconds.get(a.id)!));
-
-        for (const p of sortedProjects) {
-          const seconds = projectSeconds.get(p.id) || 0;
-          const hours = seconds / 3600;
-          const monthOverride = state.rateOverrides?.[monthKey]?.[p.id];
-
-          if (p.rateTiers && p.rateTiers.length > 0 && monthOverride == null) {
-            const segments = splitHoursIntoTiers(hours, p.rateTiers);
-            for (const seg of segments) {
-              if (seg.hours <= 0) continue;
-              lineItems.push({
-                id: uid(),
-                description: `${p.name} — ${describeTierSegment(seg)}`,
-                quantity: roundHours(seg.hours),
-                unitPrice: seg.rate,
-              });
-            }
-          } else {
-            const rate = monthOverride != null ? monthOverride : effectiveRate(p, client);
-            lineItems.push({
-              id: uid(),
-              description: p.name,
-              quantity: roundHours(hours),
-              unitPrice: rate,
-            });
-          }
-        }
+        const lineItems = buildMonthLineItems(client, projects, state.entries, state.rateOverrides, monthKey);
 
         const inv = state.settings.invoicing;
         const issueDate = todayKey();
@@ -461,6 +477,25 @@ export const useStore = create<Store>()(
           },
         }));
         return invoice;
+      },
+
+      regenerateInvoiceFromMonth: (invoiceId) => {
+        const state = get();
+        const invoice = state.invoices.find((i) => i.id === invoiceId);
+        if (!invoice || !invoice.monthKey || invoice.status !== 'draft') return;
+        const client = state.clients.find((c) => c.id === invoice.clientId);
+        if (!client) return;
+        const projects = state.projects.filter((p) => p.clientId === invoice.clientId);
+        const lineItems = buildMonthLineItems(
+          client,
+          projects,
+          state.entries,
+          state.rateOverrides,
+          invoice.monthKey
+        );
+        set((s) => ({
+          invoices: s.invoices.map((i) => (i.id === invoiceId ? { ...i, lineItems } : i)),
+        }));
       },
 
       addInvoice: (data) => {

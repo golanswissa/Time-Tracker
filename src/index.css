@@ -663,6 +663,15 @@ a { color: inherit; text-decoration: none; }
     size: A4;
     margin: 18mm 16mm;
   }
+  /* On screen, html/body/#root use height:100% + overflow-x:hidden. Because one
+     overflow axis is hidden, the other computes to `auto`, making them bounded
+     scroll containers — which clips print output to a single page. Release them
+     so the full report flows across as many pages as needed. */
+  html, body, #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
   html, body { background: #fff !important; }
   body { font-size: 11pt; }
   .no-print { display: none !important; }

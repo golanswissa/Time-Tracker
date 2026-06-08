@@ -5,6 +5,7 @@ import { EntryModal } from '../components/EntryModal';
 import { CreateInvoiceModal } from '../components/CreateInvoiceModal';
 import type { Entry } from '../types';
 import {
+  describeTierSegment,
   effectiveRate,
   entrySeconds,
   formatDuration,
@@ -15,6 +16,7 @@ import {
   parseDateKey,
   parseMonthKey,
   secondsToHours,
+  splitHoursIntoTiers,
 } from '../utils';
 
 interface Props {
@@ -461,9 +463,39 @@ function MonthDetail({
           <div></div>
         </div>
         {projectSummaries.length === 0 && <div className="empty">No entries this month.</div>}
-        {projectSummaries.map((s) => {
+        {projectSummaries.flatMap((s) => {
           const project = getProject(s.projectId);
-          return (
+
+          // Tiered projects expand into one line per tier segment so the rate
+          // breakdown (e.g. first 100 hrs @ $100, then $80 above) is visible.
+          if (s.isTiered) {
+            const segments = splitHoursIntoTiers(secondsToHours(s.seconds), project?.rateTiers || []);
+            return segments.map((seg, i) => (
+              <div key={`${s.projectId}-tier-${i}`} className="table-row cols-report-projects">
+                <div className="project-name">
+                  <span className="dot" style={{ background: i === 0 ? project?.color || '#bbb' : 'transparent' }} />
+                  <div>
+                    {i === 0 && <div>{project?.name || '(deleted)'}</div>}
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: i === 0 ? 2 : 0 }}>
+                      {describeTierSegment(seg)}
+                    </div>
+                  </div>
+                </div>
+                <div className="mono" style={{ fontWeight: 500 }}>
+                  {formatDuration(Math.round(seg.hours * 3600), settings.timeFormat)}
+                </div>
+                <div className="row" style={{ gap: 6 }}>
+                  <span className="mono">{formatMoney(seg.rate, settings.currencySymbol)}</span>
+                </div>
+                <div className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
+                  {formatMoney(seg.hours * seg.rate, settings.currencySymbol)}
+                </div>
+                <div />
+              </div>
+            ));
+          }
+
+          return [(
             <div key={s.projectId} className="table-row cols-report-projects">
               <div className="project-name">
                 <span className="dot" style={{ background: project?.color || '#bbb' }} />
@@ -475,35 +507,29 @@ function MonthDetail({
                 {formatDuration(s.seconds, settings.timeFormat)}
               </div>
               <div className="row" style={{ gap: 6 }}>
-                {s.isTiered ? (
-                  <span className="status-pill status-archived" style={{ fontSize: 11 }}>Tiered</span>
-                ) : (
-                  <>
-                    <div className="rate-input-wrap no-print">
-                      <span className="rate-prefix">{settings.currencySymbol}</span>
-                      <input
-                        className="rate-input mono"
-                        value={s.hasOverride ? String(s.rate) : (s.defaultRate || '')}
-                        placeholder={s.defaultRate ? String(s.defaultRate) : '0'}
-                        onChange={(e) => onRateChange(s.projectId, e.target.value)}
-                        inputMode="decimal"
-                        aria-label="Hourly rate for this month"
-                      />
-                    </div>
-                    <span className="print-only mono">
-                      {s.rate > 0 ? formatMoney(s.rate, settings.currencySymbol) : '—'}
-                    </span>
-                    {s.hasOverride && (
-                      <button
-                        className="iconbtn-ghost no-print"
-                        title={`Reset to default ${s.defaultRate ? formatMoney(s.defaultRate, settings.currencySymbol) : '—'}`}
-                        onClick={() => setRateOverride(monthKey, s.projectId, null)}
-                        style={{ fontSize: 11, width: 'auto', padding: '0 6px', height: 22 }}
-                      >
-                        reset
-                      </button>
-                    )}
-                  </>
+                <div className="rate-input-wrap no-print">
+                  <span className="rate-prefix">{settings.currencySymbol}</span>
+                  <input
+                    className="rate-input mono"
+                    value={s.hasOverride ? String(s.rate) : (s.defaultRate || '')}
+                    placeholder={s.defaultRate ? String(s.defaultRate) : '0'}
+                    onChange={(e) => onRateChange(s.projectId, e.target.value)}
+                    inputMode="decimal"
+                    aria-label="Hourly rate for this month"
+                  />
+                </div>
+                <span className="print-only mono">
+                  {s.rate > 0 ? formatMoney(s.rate, settings.currencySymbol) : '—'}
+                </span>
+                {s.hasOverride && (
+                  <button
+                    className="iconbtn-ghost no-print"
+                    title={`Reset to default ${s.defaultRate ? formatMoney(s.defaultRate, settings.currencySymbol) : '—'}`}
+                    onClick={() => setRateOverride(monthKey, s.projectId, null)}
+                    style={{ fontSize: 11, width: 'auto', padding: '0 6px', height: 22 }}
+                  >
+                    reset
+                  </button>
                 )}
               </div>
               <div className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
@@ -511,7 +537,7 @@ function MonthDetail({
               </div>
               <div />
             </div>
-          );
+          )];
         })}
         {projectSummaries.length > 0 && (
           <div className="table-row cols-report-projects report-total">

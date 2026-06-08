@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronLeft, Plus, Printer, Trash2, Lock, Unlock } from 'lucide-react';
+import { ChevronLeft, Plus, Printer, Trash2, Lock, Unlock, RefreshCw, Save } from 'lucide-react';
 import { useStore } from '../store';
 import type { Invoice, InvoiceLineItem } from '../types';
 import { formatDDMMYYYY, formatMoney, uid } from '../utils';
@@ -15,7 +15,11 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
   const finalizeInvoice = useStore((s) => s.finalizeInvoice);
   const reopenInvoice = useStore((s) => s.reopenInvoice);
   const deleteInvoice = useStore((s) => s.deleteInvoice);
+  const regenerateInvoiceFromMonth = useStore((s) => s.regenerateInvoiceFromMonth);
+  const updateInvoicingSettings = useStore((s) => s.updateInvoicingSettings);
+  const updateClient = useStore((s) => s.updateClient);
   const clients = useStore((s) => s.clients);
+  const [savedDefaults, setSavedDefaults] = useState(false);
 
   if (!invoice) {
     return (
@@ -69,6 +73,23 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
     }
   };
   const onReopen = () => reopenInvoice(invoice.id);
+  const onRegenerate = () => {
+    if (
+      confirm(
+        'Rebuild line items from the current time entries and rates for this month? ' +
+          'This replaces the existing line items (including any manual edits).'
+      )
+    ) {
+      regenerateInvoiceFromMonth(invoice.id);
+    }
+  };
+  const onSaveDefaults = () => {
+    // Lock this invoice's From + Payment as the global defaults, and its Bill To
+    // onto the client — so future invoices for this client pre-fill with them.
+    updateInvoicingSettings({ from: invoice.billFrom, payment: invoice.payment });
+    if (invoice.clientId) updateClient(invoice.clientId, { billing: invoice.billTo });
+    setSavedDefaults(true);
+  };
   const onDelete = () => {
     if (confirm(`Delete invoice ${invoice.number}? This cannot be undone.`)) {
       deleteInvoice(invoice.id);
@@ -99,6 +120,18 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
             <>
               <button className="btn btn-danger-ghost" onClick={onDelete}>
                 <Trash2 size={14} /> Delete
+              </button>
+              {invoice.monthKey && (
+                <button className="btn" onClick={onRegenerate} title="Rebuild line items from this month's time entries and rates">
+                  <RefreshCw size={14} /> Regenerate
+                </button>
+              )}
+              <button
+                className="btn"
+                onClick={onSaveDefaults}
+                title={`Lock From, Payment, and Bill To as defaults for ${client?.name ?? 'this client'}`}
+              >
+                <Save size={14} /> Save as defaults
               </button>
               <button className="btn" onClick={onFinalize}>
                 <Lock size={14} /> Finalize
@@ -369,6 +402,16 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
           background: '#ecfdf5', color: '#065f46', fontSize: 13,
         }}>
           This invoice is finalized. Click <strong>Reopen</strong> if you need to make further edits.
+        </div>
+      )}
+
+      {savedDefaults && (
+        <div className="no-print" style={{
+          marginTop: 16, padding: '10px 12px', borderRadius: 6,
+          background: '#ecfdf5', color: '#065f46', fontSize: 13,
+        }}>
+          Saved. From &amp; Payment details are now your defaults, and Bill To is saved for{' '}
+          <strong>{client?.name ?? 'this client'}</strong> — new invoices will pre-fill with these.
         </div>
       )}
     </div>
