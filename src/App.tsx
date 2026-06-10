@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { TopNav } from './components/TopNav';
 import { TimerPage } from './pages/TimerPage';
+import { TodayPage } from './pages/TodayPage';
+import { PlanPage } from './pages/PlanPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -11,7 +13,7 @@ import { InvoicePage } from './pages/InvoicePage';
 import type { Route } from './types';
 import { seedIfEmpty } from './store';
 
-const ALL_ROUTES: Route[] = ['timer', 'clients', 'reports', 'projects', 'tasks', 'invoices', 'settings'];
+const ALL_ROUTES: Route[] = ['today', 'plan', 'timer', 'clients', 'reports', 'projects', 'tasks', 'invoices', 'settings'];
 
 const parseHash = (): { route: Route; param?: string } => {
   const raw = window.location.hash.replace(/^#\//, '');
@@ -19,7 +21,7 @@ const parseHash = (): { route: Route; param?: string } => {
   if ((ALL_ROUTES as string[]).includes(head)) {
     return { route: head as Route, param: rest.join('/') || undefined };
   }
-  return { route: 'timer' };
+  return { route: 'today' };
 };
 
 export default function App() {
@@ -105,6 +107,8 @@ export default function App() {
         if (r === 'invoices') setOpenInvoiceId(null);
         setRoute(r);
       }} />
+      {route === 'today' && <TodayPage onNavigate={setRoute} />}
+      {route === 'plan' && <PlanPage />}
       {route === 'timer' && <TimerPage />}
       {route === 'clients' && <ClientsPage onOpenReport={gotoReports} />}
       {route === 'reports' && (

@@ -31,3 +31,4 @@ dist-ssr
 
 # Claude / preview server internals
 .claude/launch.json
+tsconfig.tsbuildinfo

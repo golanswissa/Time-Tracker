@@ -1,12 +1,14 @@
 import type { Route } from '../types';
 
 const items: { id: Route; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: 'plan', label: 'Plan' },
   { id: 'timer', label: 'Time' },
   { id: 'clients', label: 'Clients' },
   { id: 'projects', label: 'Projects' },
   { id: 'reports', label: 'Reports' },
   { id: 'invoices', label: 'Invoices' },
-  { id: 'tasks', label: 'Tasks' },
+  { id: 'tasks', label: 'Categories' },
 ];
 
 interface Props {

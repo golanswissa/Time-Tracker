@@ -66,6 +66,45 @@ export interface Entry {
   durationSeconds: number;
   isRunning: boolean;
   startedAt?: string;
+  /** If this entry was tracked against a planner task, its id. */
+  scheduledTaskId?: string;
+}
+
+/* ----------------------- Planner (scheduled tasks) ----------------------- */
+
+export type TaskStatus = 'todo' | 'doing' | 'done' | 'blocked';
+export type TaskPriority = 'asap' | 'high' | 'normal' | 'low';
+export type TaskKind = 'design' | 'print' | 'meeting' | 'email' | 'admin';
+
+/**
+ * A planned, schedulable to-do — distinct from `Task` (which is a time-entry
+ * category). Lives on the Plan board, can have a deadline, and accumulates
+ * actual hours from linked time entries.
+ */
+export interface ScheduledTask {
+  id: string;
+  title: string;
+  description?: string;
+  clientId?: string;
+  projectId?: string;
+  /** Day this task is scheduled on (YYYY-MM-DD, local). */
+  date: string;
+  /** Optional hard deadline (YYYY-MM-DD, local). */
+  deadline?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  kind: TaskKind;
+  /** Planning estimate, in hours. */
+  estimateHours?: number;
+  /** URLs pulled from the source message (Figma, Drive, …). */
+  links?: string[];
+  /** Image attachments as data URLs (pasted screenshots). */
+  attachments?: string[];
+  /** Where it came from. */
+  source?: 'manual' | 'paste';
+  /** Original pasted text, if created from a capture. */
+  rawText?: string;
+  createdAt: string;
 }
 
 export type WeekStart = 'mon' | 'sun';
@@ -145,6 +184,8 @@ export interface Invoice {
 
 export type Route =
   | 'timer'
+  | 'today'
+  | 'plan'
   | 'clients'
   | 'reports'
   | 'projects'

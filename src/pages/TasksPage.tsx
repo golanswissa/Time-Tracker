@@ -11,14 +11,18 @@ export function TasksPage() {
   return (
     <div className="page">
       <div className="topbar">
-        <h1>Tasks</h1>
+        <h1>Categories</h1>
         <div className="topbar-right">
           <button className="btn btn-dark" onClick={() => setEditing(null)}>
             <Plus size={14} />
-            New task
+            New category
           </button>
         </div>
       </div>
+      <p style={{ color: 'var(--text-muted)', marginTop: -16, marginBottom: 20, fontSize: 14 }}>
+        Categories label the <em>type</em> of work on a time entry (Design, Development…). For your
+        to-dos and schedule, use <strong>Plan</strong>.
+      </p>
 
       <div className="table">
         <div className="table-head cols-tasks">
@@ -28,8 +32,8 @@ export function TasksPage() {
         </div>
         {tasks.length === 0 && (
           <div className="empty">
-            <strong>No tasks yet</strong>
-            Tasks are the categories of work you track (e.g. Development, Meetings, Research).
+            <strong>No categories yet</strong>
+            Categories are the kinds of work you track (e.g. Development, Meetings, Research).
           </div>
         )}
         {tasks.map((t) => (

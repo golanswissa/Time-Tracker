@@ -8,8 +8,10 @@ import type {
   InvoicingSettings,
   Project,
   RateOverrides,
+  ScheduledTask,
   Settings,
   Task,
+  TaskStatus,
 } from './types';
 import {
   addDaysToKey,
@@ -43,9 +45,13 @@ interface State {
   tasks: Task[];
   entries: Entry[];
   invoices: Invoice[];
+  scheduledTasks: ScheduledTask[];
   rateOverrides: RateOverrides;
   settings: Settings;
 }
+
+/** Assumed billable hours available in a working day, for capacity math. */
+export const DEFAULT_DAILY_HOURS = 8;
 
 interface Actions {
   // Clients
@@ -87,6 +93,15 @@ interface Actions {
   reopenInvoice: (id: string) => void;
   deleteInvoice: (id: string) => void;
 
+  // Planner — scheduled tasks
+  addScheduledTask: (data: Omit<ScheduledTask, 'id' | 'createdAt' | 'status'> & { status?: TaskStatus }) => ScheduledTask;
+  updateScheduledTask: (id: string, data: Partial<ScheduledTask>) => void;
+  deleteScheduledTask: (id: string) => void;
+  moveTaskToDay: (id: string, date: string) => void;
+  setTaskStatus: (id: string, status: TaskStatus) => void;
+  /** Start (or restart) a timer tracked against a scheduled task. */
+  startTaskTimer: (taskId: string) => Entry | undefined;
+
   // Settings
   updateSettings: (data: Partial<Settings>) => void;
   updateInvoicingSettings: (data: Partial<InvoicingSettings>) => void;
@@ -105,6 +120,7 @@ const initialState: State = {
   tasks: [],
   entries: [],
   invoices: [],
+  scheduledTasks: [],
   rateOverrides: {},
   settings: {
     weekStart: 'mon',
@@ -539,6 +555,63 @@ export const useStore = create<Store>()(
       deleteInvoice: (id) =>
         set((s) => ({ invoices: s.invoices.filter((inv) => inv.id !== id) })),
 
+      // ---------- Planner: scheduled tasks ----------
+      addScheduledTask: (data) => {
+        const t: ScheduledTask = {
+          ...data,
+          id: uid(),
+          status: data.status || 'todo',
+          createdAt: new Date().toISOString(),
+        };
+        set((s) => ({ scheduledTasks: [...s.scheduledTasks, t] }));
+        return t;
+      },
+      updateScheduledTask: (id, data) =>
+        set((s) => ({
+          scheduledTasks: s.scheduledTasks.map((t) => (t.id === id ? { ...t, ...data } : t)),
+        })),
+      deleteScheduledTask: (id) =>
+        set((s) => ({
+          scheduledTasks: s.scheduledTasks.filter((t) => t.id !== id),
+          // Keep the tracked time, just drop the link.
+          entries: s.entries.map((e) => (e.scheduledTaskId === id ? { ...e, scheduledTaskId: undefined } : e)),
+        })),
+      moveTaskToDay: (id, date) =>
+        set((s) => ({
+          scheduledTasks: s.scheduledTasks.map((t) => (t.id === id ? { ...t, date } : t)),
+        })),
+      setTaskStatus: (id, status) =>
+        set((s) => ({
+          scheduledTasks: s.scheduledTasks.map((t) => (t.id === id ? { ...t, status } : t)),
+        })),
+      startTaskTimer: (taskId) => {
+        const state = get();
+        const task = state.scheduledTasks.find((t) => t.id === taskId);
+        if (!task) return undefined;
+        const projectId = task.projectId || state.projects[0]?.id;
+        const category = state.settings.defaultTaskId || state.tasks[0]?.id;
+        if (!projectId || !category) return undefined; // need a project + a task category to track
+        get().stopTimer();
+        const entry: Entry = {
+          id: uid(),
+          projectId,
+          taskId: category,
+          notes: task.title,
+          date: todayKey(),
+          durationSeconds: 0,
+          isRunning: true,
+          startedAt: new Date().toISOString(),
+          scheduledTaskId: task.id,
+        };
+        set((s) => ({
+          entries: [...s.entries, entry],
+          scheduledTasks: s.scheduledTasks.map((t) =>
+            t.id === taskId && t.status === 'todo' ? { ...t, status: 'doing' } : t
+          ),
+        }));
+        return entry;
+      },
+
       updateSettings: (data) =>
         set((s) => ({
           settings: {
@@ -564,9 +637,9 @@ export const useStore = create<Store>()(
 
       // ---------- Data ----------
       exportAll: () => {
-        const { clients, projects, tasks, entries, invoices, rateOverrides, settings } = get();
+        const { clients, projects, tasks, entries, invoices, scheduledTasks, rateOverrides, settings } = get();
         return JSON.stringify(
-          { version: 4, clients, projects, tasks, entries, invoices, rateOverrides, settings },
+          { version: 5, clients, projects, tasks, entries, invoices, scheduledTasks, rateOverrides, settings },
           null,
           2
         );
@@ -580,6 +653,7 @@ export const useStore = create<Store>()(
             tasks = [],
             entries = [],
             invoices = [],
+            scheduledTasks = [],
             rateOverrides,
             settings,
           } = parsed;
@@ -601,6 +675,7 @@ export const useStore = create<Store>()(
             tasks,
             entries,
             invoices,
+            scheduledTasks: Array.isArray(scheduledTasks) ? scheduledTasks : [],
             rateOverrides: rateOverrides && typeof rateOverrides === 'object' ? rateOverrides : {},
             settings: normalizeSettings(settings),
           });
@@ -627,6 +702,7 @@ export const useStore = create<Store>()(
           clients: migrated.clients ?? p.clients ?? [],
           projects: migrated.projects ?? p.projects ?? [],
           invoices: p.invoices ?? [],
+          scheduledTasks: p.scheduledTasks ?? [],
           rateOverrides: p.rateOverrides ?? {},
           settings: normalizeSettings(p.settings),
         };
