@@ -29,6 +29,15 @@ export const cloudStatus = () => status;
 const localMtime = (): number => Number(localStorage.getItem(MTIME_KEY) || '0');
 const setMtime = (n: number) => localStorage.setItem(MTIME_KEY, String(n));
 
+/** Count of "real" records — used to stop an empty cloud clobbering real local work. */
+function realDataCount(s: {
+  entries?: unknown[];
+  invoices?: unknown[];
+  scheduledTasks?: unknown[];
+}): number {
+  return (s.entries?.length || 0) + (s.invoices?.length || 0) + (s.scheduledTasks?.length || 0);
+}
+
 export async function initCloudSync(): Promise<void> {
   if (!supabase) return;
   status = 'syncing';
@@ -42,7 +51,12 @@ export async function initCloudSync(): Promise<void> {
 
     if (data?.data) {
       const cloudM = data.updated_at ? Date.parse(data.updated_at) : 0;
-      if (localMtime() > cloudM) {
+      const localReal = realDataCount(useStore.getState());
+      const cloudReal = realDataCount(data.data);
+      if (localReal > 0 && cloudReal === 0) {
+        // SAFETY: never let an empty/seed-only cloud wipe real local work.
+        await push();
+      } else if (localMtime() > cloudM) {
         await push(); // local edits are newer — keep them, upload
       } else {
         adopt(JSON.stringify(data.data), cloudM); // cloud wins
