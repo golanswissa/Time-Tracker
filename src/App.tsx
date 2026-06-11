@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import { TopNav } from './components/TopNav';
-import { TimerPage } from './pages/TimerPage';
-import { TodayPage } from './pages/TodayPage';
-import { PlanPage } from './pages/PlanPage';
+import { AppShell } from './components/AppShell';
+import { DayView } from './pages/DayView';
 import { ClientsPage } from './pages/ClientsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ProjectsPage } from './pages/ProjectsPage';
@@ -46,70 +44,27 @@ export default function App() {
     const onHash = () => {
       const next = parseHash();
       setRoute(next.route);
-      if (next.route === 'invoices') {
-        setOpenInvoiceId(next.param || null);
-      } else {
-        setOpenInvoiceId(null);
-      }
+      setOpenInvoiceId(next.route === 'invoices' ? next.param || null : null);
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  // "G then X" shortcuts (ignored while typing)
-  useEffect(() => {
-    let lastG = 0;
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'SELECT' ||
-        target.isContentEditable
-      ) return;
-      if (e.key === 'g' || e.key === 'G') { lastG = Date.now(); return; }
-      const within = Date.now() - lastG < 1200;
-      if (!within) return;
-      const map: Record<string, Route> = {
-        t: 'timer',
-        c: 'clients',
-        r: 'reports',
-        p: 'projects',
-        i: 'invoices',
-        k: 'tasks',
-        s: 'settings',
-      };
-      const r = map[e.key.toLowerCase()];
-      if (r) {
-        if (r === 'invoices') setOpenInvoiceId(null);
-        setRoute(r);
-        lastG = 0;
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  const gotoReports = (clientId: string) => { setReportsInitialClient(clientId); setRoute('reports'); };
+  const openInvoice = (id: string) => { setOpenInvoiceId(id); setRoute('invoices'); };
 
-  const gotoReports = (clientId: string) => {
-    setReportsInitialClient(clientId);
-    setRoute('reports');
+  const navigate = (r: Route) => {
+    setReportsInitialClient(null);
+    if (r === 'invoices') setOpenInvoiceId(null);
+    setRoute(r);
   };
 
-  const openInvoice = (id: string) => {
-    setOpenInvoiceId(id);
-    setRoute('invoices');
-  };
+  // 'today' is the home; legacy 'timer'/'plan' hashes fall through to it too.
+  const isDay = route === 'today' || route === 'timer' || route === 'plan';
 
   return (
-    <>
-      <TopNav route={route} onNavigate={(r) => {
-        setReportsInitialClient(null);
-        if (r === 'invoices') setOpenInvoiceId(null);
-        setRoute(r);
-      }} />
-      {route === 'today' && <TodayPage onNavigate={setRoute} />}
-      {route === 'plan' && <PlanPage />}
-      {route === 'timer' && <TimerPage />}
+    <AppShell route={isDay ? 'today' : route} onNavigate={navigate}>
+      {isDay && <DayView />}
       {route === 'clients' && <ClientsPage onOpenReport={gotoReports} />}
       {route === 'reports' && (
         <ReportsPage
@@ -126,6 +81,6 @@ export default function App() {
           : <InvoicesPage onOpenInvoice={openInvoice} />
       )}
       {route === 'settings' && <SettingsPage />}
-    </>
+    </AppShell>
   );
 }

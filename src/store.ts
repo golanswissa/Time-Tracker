@@ -101,6 +101,8 @@ interface Actions {
   setTaskStatus: (id: string, status: TaskStatus) => void;
   /** Start (or restart) a timer tracked against a scheduled task. */
   startTaskTimer: (taskId: string) => Entry | undefined;
+  /** Manually set a task's total tracked time (collapses its entries into one). */
+  setTaskHours: (taskId: string, seconds: number) => void;
 
   // Settings
   updateSettings: (data: Partial<Settings>) => void;
@@ -611,6 +613,30 @@ export const useStore = create<Store>()(
         }));
         return entry;
       },
+      setTaskHours: (taskId, seconds) =>
+        set((s) => {
+          const task = s.scheduledTasks.find((t) => t.id === taskId);
+          if (!task) return {} as Partial<State>;
+          const projectId = task.projectId || s.projects[0]?.id;
+          const category = s.settings.defaultTaskId || s.tasks[0]?.id;
+          const date = task.date || todayKey();
+          // Drop this task's existing entries, then add one manual entry for the total.
+          const rest = s.entries.filter((e) => e.scheduledTaskId !== taskId);
+          const secs = Math.max(0, Math.floor(seconds));
+          if (secs > 0 && projectId && category) {
+            rest.push({
+              id: uid(),
+              projectId,
+              taskId: category,
+              notes: task.title,
+              date,
+              durationSeconds: secs,
+              isRunning: false,
+              scheduledTaskId: taskId,
+            });
+          }
+          return { entries: rest };
+        }),
 
       updateSettings: (data) =>
         set((s) => ({
