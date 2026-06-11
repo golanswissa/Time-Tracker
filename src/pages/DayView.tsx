@@ -59,7 +59,10 @@ export function DayView() {
   };
 
   const shiftDay = (d: number) => setSelectedDate((cur) => addDays(cur, d));
-  const onCardClick = (t: ScheduledTask) => {
+  // Clicking the card body only expands/selects it — it does NOT start the timer.
+  const expand = (t: ScheduledTask) => setActiveId(t.id);
+  // The play/pause button is the only thing that starts/stops tracking.
+  const onPlay = (t: ScheduledTask) => {
     if (runningTaskId === t.id) stopTimer();
     else startTaskTimer(t.id);
     setActiveId(t.id);
@@ -108,7 +111,7 @@ export function DayView() {
 
           if (t.id === expandedId) {
             return (
-              <div key={t.id} className={`wk-card exp ${running ? 'run' : worked ? 'done' : ''}`} onClick={() => onCardClick(t)}>
+              <div key={t.id} className={`wk-card exp ${running ? 'run' : worked ? 'done' : ''}`} onClick={() => expand(t)}>
                 <div className="top">
                   <div>
                     <div className="pj">{project?.name || client?.name || 'No project'}</div>
@@ -116,11 +119,11 @@ export function DayView() {
                   </div>
                   <div className="acts">
                     <button className="wk-ed" title="Edit" onClick={(e) => { e.stopPropagation(); openEdit(t.id); }}><IconPencil /></button>
-                    <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onCardClick(t); }}>{running ? <IconPause /> : <IconPlay />}</button>
+                    <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onPlay(t); }}>{running ? <IconPause /> : <IconPlay />}</button>
                   </div>
                 </div>
                 {t.description && <div className="desc">{t.description}</div>}
-                <div className="time mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(tracked)}</div>
+                <div className="time mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(tracked, running)}</div>
                 {estS > 0 && (
                   <div className="wk-pbar">
                     <div className="track"><div className="tick" style={{ left: `${pct}%` }} /></div>
@@ -134,13 +137,13 @@ export function DayView() {
             );
           }
           return (
-            <div key={t.id} className={`wk-card cond ${worked ? 'done' : ''}`} onClick={() => onCardClick(t)}>
-              <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onCardClick(t); }}>{running ? <IconPause /> : <IconPlay />}</button>
+            <div key={t.id} className={`wk-card cond ${running ? 'run' : worked ? 'done' : ''}`} onClick={() => expand(t)}>
+              <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onPlay(t); }}>{running ? <IconPause /> : <IconPlay />}</button>
               <div>
                 <div className="nm">{t.title}</div>
                 <div className="pj">{project?.name || client?.name || 'No project'}</div>
               </div>
-              <div className="t mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(tracked)}</div>
+              <div className="t mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(tracked, running)}</div>
               <div className="wk-cbar"><i style={{ width: `${estS > 0 ? pct : (worked ? 100 : 0)}%` }} /></div>
             </div>
           );

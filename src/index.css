@@ -1259,9 +1259,10 @@ a { color: inherit; text-decoration: none; }
 .wk-cp-box{ padding:12px; border-top:1px solid var(--gray-100); } .wk-cp-box .b{ background:#f4f4f5; border-radius:12px; padding:11px 13px; font-size:13px; color:var(--text-faint); display:flex; align-items:center; } .wk-cp-box .b .s{ margin-left:auto; width:26px; height:26px; border-radius:8px; background:var(--ink, #161616); color:#fff; display:inline-flex; align-items:center; justify-content:center; }
 
 /* edit/create panel (overlay) */
-.wk-ov{ position:fixed; inset:0; background:rgba(0,0,0,.18); z-index:30; }
-.wk-panel{ position:fixed; top:0; right:0; height:100%; width:450px; max-width:94vw; background:#fff; box-shadow:-12px 0 34px -12px rgba(0,0,0,.26); z-index:31; padding:22px 26px 24px; display:flex; flex-direction:column; gap:18px; overflow:auto; animation:wkslide .2s ease; }
-@keyframes wkslide{ from{ transform:translateX(40px); opacity:.5;} to{ transform:none; opacity:1; } }
+.wk-ov{ position:fixed; inset:0; background:rgba(0,0,0,.18); z-index:30; opacity:0; pointer-events:none; transition:opacity .22s ease; }
+.wk-ov.on{ opacity:1; pointer-events:auto; }
+.wk-panel{ position:fixed; top:0; right:0; height:100%; width:450px; max-width:94vw; background:#fff; box-shadow:-12px 0 34px -12px rgba(0,0,0,.26); z-index:31; padding:22px 26px 24px; display:flex; flex-direction:column; gap:18px; overflow:auto; transform:translateX(100%); transition:transform .24s cubic-bezier(.22,1,.36,1); }
+.wk-panel.on{ transform:none; }
 .wk-ptop{ display:flex; align-items:center; gap:16px; } .wk-px{ margin-left:auto; border:none; background:none; font-size:21px; color:var(--text-faint); cursor:pointer; }
 .wk-cs{ position:relative; } .wk-chip{ display:inline-flex; align-items:center; gap:7px; border:none; background:none; font-size:14px; font-weight:600; cursor:pointer; padding:3px 0; } .wk-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
 .wk-menu{ position:absolute; top:100%; left:-6px; margin-top:6px; background:#fff; border:1px solid var(--gray-100); border-radius:9px; box-shadow:0 10px 28px -10px rgba(0,0,0,.28); padding:5px; min-width:140px; z-index:32; }
@@ -1277,3 +1278,13 @@ a { color: inherit; text-decoration: none; }
 .wk-pfoot{ display:flex; align-items:center; margin-top:auto; padding-top:16px; }
 .wk-del{ border:1px solid var(--gray-100); background:#fff; width:38px; height:38px; border-radius:9px; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; } .wk-del:hover{ color:var(--wk-red); border-color:#e3c9bf; } .wk-del svg{ width:15px; height:15px; }
 .wk-save{ margin-left:auto; height:38px; padding:0 24px; border-radius:9px; border:none; background:var(--ink, #161616); color:#fff; font-weight:600; font-size:13px; cursor:pointer; }
+
+/* condensed card that is actively running (collapsed but still tracking) */
+.wk-card.cond.run{ background:#fdfcef; border-color:#ece4a3; }
+.wk-card.cond.run .t{ color:#161616; }
+.wk-card.cond.run .wk-cbar i{ background:#c9a800; }
+.wk-card.cond.run .wk-pp{ background:var(--ink, #161616); color:var(--wk-yellow); border-color:var(--ink, #161616); }
+
+/* never-started tasks (0:00) read gray, not dark */
+.wk-card.cond .t{ color:var(--text-faint); }
+.wk-card.exp:not(.run):not(.done) .time{ color:var(--text-faint); }

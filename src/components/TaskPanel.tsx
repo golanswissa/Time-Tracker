@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { actualSecondsForTask } from '../planner';
@@ -31,6 +31,10 @@ interface Form {
   kind: TaskKind; estimate: string; hours: string; description: string;
   status: TaskStatus; priority: TaskPriority;
 }
+const blankForm = (): Form => ({
+  title: '', clientId: '', projectId: '', date: todayKey(), deadline: '',
+  kind: 'design', estimate: '', hours: '0:00', description: '', status: 'todo', priority: 'normal',
+});
 
 export function TaskPanel() {
   const taskPanel = useUI((s) => s.taskPanel);
@@ -46,16 +50,20 @@ export function TaskPanel() {
   const startTaskTimer = useStore((s) => s.startTaskTimer);
   const stopTimer = useStore((s) => s.stopTimer);
 
+  const open = taskPanel !== null;
   const isNew = taskPanel === 'new';
   const task = !isNew && taskPanel ? tasks.find((t) => t.id === taskPanel) : undefined;
   const tracked = task ? actualSecondsForTask(entries, task.id) : 0;
   const running = !!task && entries.some((e) => e.isRunning && e.scheduledTaskId === task.id);
 
-  const [form, setForm] = useState<Form | null>(null);
+  const [form, setForm] = useState<Form>(blankForm);
   const [menu, setMenu] = useState<'status' | 'prio' | null>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
 
+  // Populate only on open (keep the content during the slide-out close).
   useEffect(() => {
-    if (!taskPanel) { setForm(null); return; }
+    if (!taskPanel) return;
+    setMenu(null);
     if (task) {
       setForm({
         title: task.title, clientId: task.clientId || '', projectId: task.projectId || '',
@@ -65,22 +73,18 @@ export function TaskPanel() {
         status: task.status, priority: task.priority,
       });
     } else {
-      setForm({
-        title: '', clientId: '', projectId: '', date: todayKey(), deadline: '',
-        kind: 'design', estimate: '', hours: '0:00', description: '',
-        status: 'todo', priority: 'normal',
-      });
+      setForm(blankForm());
+      setTimeout(() => titleRef.current?.focus(), 80);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskPanel]);
 
   const clientProjects = useMemo(
-    () => projects.filter((p) => !form?.clientId || p.clientId === form.clientId),
-    [projects, form?.clientId]
+    () => projects.filter((p) => !form.clientId || p.clientId === form.clientId),
+    [projects, form.clientId]
   );
 
-  if (!taskPanel || !form) return null;
-  const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
+  const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
 
   const onSave = () => {
     const fields = {
@@ -117,8 +121,8 @@ export function TaskPanel() {
 
   return (
     <>
-      <div className="wk-ov" onClick={closePanel} />
-      <aside className="wk-panel" onClick={() => setMenu(null)}>
+      <div className={`wk-ov ${open ? 'on' : ''}`} onClick={closePanel} />
+      <aside className={`wk-panel ${open ? 'on' : ''}`} onClick={() => setMenu(null)} aria-hidden={!open}>
         <div className="wk-ptop" onClick={(e) => e.stopPropagation()}>
           <div className="wk-cs">
             <button className="wk-chip" style={{ color: sMeta.c }} onClick={() => setMenu(menu === 'status' ? null : 'status')}>
@@ -151,7 +155,7 @@ export function TaskPanel() {
           <button className="wk-px" onClick={closePanel} aria-label="Close">×</button>
         </div>
 
-        <input className="wk-ptitle" value={form.title} placeholder="Task title" autoFocus={isNew}
+        <input ref={titleRef} className="wk-ptitle" value={form.title} placeholder="Task title"
           onChange={(e) => set({ title: e.target.value })} />
 
         <div className="wk-grid2">
