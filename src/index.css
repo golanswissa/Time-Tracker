@@ -1304,9 +1304,10 @@ a { color: inherit; text-decoration: none; }
 .wk-pfab:hover{ transform:scale(1.06); }
 .wk-pfab svg{ width:18px; height:18px; }
 
-/* project cards — same treatment as task cards, 2 per row, white */
-.wk-pgrid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
-@media (max-width:620px){ .wk-pgrid{ grid-template-columns:1fr; } }
+/* project cards — same treatment as task cards, up to 2 per row, white.
+   auto-fit collapses empty tracks so a single card fills the width
+   instead of sitting cramped in a corner. */
+.wk-pgrid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
 .wk-pcard{ background:#fff; border:1px solid var(--gray-100); border-radius:4px; cursor:pointer; text-align:left; padding:18px 20px 20px; display:flex; flex-direction:column; transition:border-color .15s, background .15s; }
 .wk-pcard:hover{ border-color:#d6d6da; }
 .wk-pc-head{ display:flex; align-items:flex-start; gap:12px; }
