@@ -63,7 +63,7 @@ export function AppShell({ route, onNavigate, children }: Props) {
         <div className="wk-top">
           <button className="wk-ham" onClick={toggleNav} aria-label="Menu"><IconHam /></button>
           <div className="wk-tr">
-            <button className="wk-rb wk-add" onClick={openCreate} title="New task"><IconPlus /></button>
+            <button className="wk-rb wk-add" onClick={() => openCreate()} title="New task"><IconPlus /></button>
             <button className="wk-rb wk-exp" onClick={toggleChat} title="Assistant"><IconLines /></button>
           </div>
         </div>

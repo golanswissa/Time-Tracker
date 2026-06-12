@@ -95,7 +95,7 @@ export function DayView() {
         {dayTasks.length === 0 && (
           <div className="wk-empty">
             Nothing here yet — hit <b>+</b> to add a task{' '}
-            <button className="wk-today" style={{ marginLeft: 6 }} onClick={openCreate}>New task</button>
+            <button className="wk-today" style={{ marginLeft: 6 }} onClick={() => openCreate()}>New task</button>
           </div>
         )}
         {dayTasks.map((t) => {
@@ -105,8 +105,8 @@ export function DayView() {
           const running = runningTaskId === t.id;
           const worked = tracked > 0;
           const estS = (t.estimateHours || 0) * 3600;
-          const over = estS > 0 && tracked > estS;
           const overH = Math.round((tracked - estS) / 3600);
+          const over = estS > 0 && overH >= 1;
           const pct = estS > 0 ? Math.min(100, (tracked / estS) * 100) : 0;
 
           if (t.id === expandedId) {

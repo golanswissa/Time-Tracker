@@ -3,7 +3,7 @@ import { AppShell } from './components/AppShell';
 import { DayView } from './pages/DayView';
 import { ClientsPage } from './pages/ClientsPage';
 import { ReportsPage } from './pages/ReportsPage';
-import { ProjectsPage } from './pages/ProjectsPage';
+import { ProjectsView } from './pages/ProjectsView';
 import { TasksPage } from './pages/TasksPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -73,7 +73,7 @@ export default function App() {
           onOpenInvoice={openInvoice}
         />
       )}
-      {route === 'projects' && <ProjectsPage />}
+      {route === 'projects' && <ProjectsView />}
       {route === 'tasks' && <TasksPage />}
       {route === 'invoices' && (
         openInvoiceId

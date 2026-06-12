@@ -38,6 +38,7 @@ const blankForm = (): Form => ({
 
 export function TaskPanel() {
   const taskPanel = useUI((s) => s.taskPanel);
+  const createPreset = useUI((s) => s.createPreset);
   const closePanel = useUI((s) => s.closePanel);
   const clients = useStore((s) => s.clients);
   const projects = useStore((s) => s.projects);
@@ -73,7 +74,7 @@ export function TaskPanel() {
         status: task.status, priority: task.priority,
       });
     } else {
-      setForm(blankForm());
+      setForm({ ...blankForm(), projectId: createPreset?.projectId || '', clientId: createPreset?.clientId || '', date: createPreset?.date || todayKey() });
       setTimeout(() => titleRef.current?.focus(), 80);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

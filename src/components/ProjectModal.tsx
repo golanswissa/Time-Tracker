@@ -67,6 +67,8 @@ export function ProjectModal({ project, defaultClientId, onClose }: Props) {
   );
   const [color, setColor] = useState(project?.color || DEFAULT_PROJECT_COLORS[0]);
   const [status, setStatus] = useState<Project['status']>(project?.status || 'active');
+  const [description, setDescription] = useState(project?.description || '');
+  const [image, setImage] = useState(project?.image || '');
   const [hourlyRate, setHourlyRate] = useState<string>(
     project?.hourlyRate != null ? String(project.hourlyRate) : ''
   );
@@ -133,6 +135,8 @@ export function ProjectModal({ project, defaultClientId, onClose }: Props) {
         clientId,
         color,
         status,
+        description: description.trim() || undefined,
+        image: image.trim() || undefined,
         hourlyRate: rate,
         rateTiers: tieredEnabled ? nextTiers : undefined,
       });
@@ -142,6 +146,8 @@ export function ProjectModal({ project, defaultClientId, onClose }: Props) {
         clientId,
         color,
         status,
+        description: description.trim() || undefined,
+        image: image.trim() || undefined,
         hourlyRate: rate,
         rateTiers: tieredEnabled ? nextTiers : undefined,
       });
@@ -213,6 +219,27 @@ export function ProjectModal({ project, defaultClientId, onClose }: Props) {
           onChange={(e) => { setName(e.target.value); setError(null); }}
           autoFocus
         />
+      </div>
+      <div className="field">
+        <label>Description (optional)</label>
+        <input
+          className="input"
+          placeholder="One line — e.g. Marketing site + landing pages"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+      <div className="field">
+        <label>Cover image URL (optional)</label>
+        <input
+          className="input"
+          placeholder="Leave blank for geometric art"
+          value={image}
+          onChange={(e) => setImage(e.target.value)}
+        />
+        <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
+          Paste an image link to use as the card cover. Blank = auto geometric art in the project color.
+        </span>
       </div>
       <div className="modal-row">
         <div className="field">

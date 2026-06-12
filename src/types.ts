@@ -35,6 +35,10 @@ export interface Project {
   name: string;
   color: string;
   status: ProjectStatus;
+  /** Short one-line description shown on the project card. */
+  description?: string;
+  /** Optional cover image URL. When absent, a generated geometric pattern is used. */
+  image?: string;
   /** Project-level override of the client's hourly rate. Undefined = inherit client rate. */
   hourlyRate?: number;
   /**
