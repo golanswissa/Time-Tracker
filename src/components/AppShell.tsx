@@ -39,6 +39,7 @@ export function AppShell({ route, onNavigate, children }: Props) {
   const toggleNav = useUI((s) => s.toggleNav);
   const toggleChat = useUI((s) => s.toggleChat);
   const openCreate = useUI((s) => s.openCreate);
+  const dayDate = useUI((s) => s.dayDate);
 
   return (
     <div className="wk-app">
@@ -82,7 +83,7 @@ export function AppShell({ route, onNavigate, children }: Props) {
         <div className="wk-top">
           <button className="wk-ham" onClick={toggleNav} aria-label="Menu"><IconHam /></button>
           <div className="wk-tr">
-            <button className="wk-rb wk-add" onClick={() => openCreate()} title="New task"><IconPlus /></button>
+            <button className="wk-rb wk-add" onClick={() => openCreate(route === 'today' ? { date: dayDate } : undefined)} title="New task"><IconPlus /></button>
             <button className="wk-rb wk-exp" onClick={toggleChat} title="Assistant"><IconLines /></button>
           </div>
         </div>

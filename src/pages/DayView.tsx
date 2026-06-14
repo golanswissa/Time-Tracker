@@ -18,6 +18,7 @@ export function DayView() {
   const stopTimer = useStore((s) => s.stopTimer);
   const openEdit = useUI((s) => s.openEdit);
   const openCreate = useUI((s) => s.openCreate);
+  const setDayDate = useUI((s) => s.setDayDate);
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -28,6 +29,8 @@ export function DayView() {
   }, []);
 
   const selectedKey = toDateKey(selectedDate);
+  // keep the shell's "+" button creating tasks on the day you're looking at
+  useEffect(() => { setDayDate(selectedKey); }, [selectedKey, setDayDate]);
 
   const dayTasks = useMemo(
     () => scheduledTasks.filter((t) => t.date === selectedKey).slice().sort(sortTasks),
@@ -112,7 +115,7 @@ export function DayView() {
         {dayTasks.length === 0 && (
           <div className="wk-empty">
             Nothing here yet — hit <b>+</b> to add a task{' '}
-            <button className="wk-today" style={{ marginLeft: 6 }} onClick={() => openCreate()}>New task</button>
+            <button className="wk-today" style={{ marginLeft: 6 }} onClick={() => openCreate({ date: selectedKey })}>New task</button>
           </div>
         )}
         {dayTasks.map((t) => {

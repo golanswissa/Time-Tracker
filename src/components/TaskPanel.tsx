@@ -110,7 +110,11 @@ export function TaskPanel() {
     closePanel();
   };
   const onDelete = () => {
-    if (task && confirm(`Delete "${task.title}"? Its tracked time is unlinked but kept.`)) {
+    if (!task) return;
+    const msg = tracked > 0
+      ? `Delete "${task.title}"? This also removes its ${formatHMS(tracked)} of tracked time.`
+      : `Delete "${task.title}"?`;
+    if (confirm(msg)) {
       deleteScheduledTask(task.id);
       closePanel();
     }

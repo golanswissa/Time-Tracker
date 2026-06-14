@@ -575,8 +575,9 @@ export const useStore = create<Store>()(
       deleteScheduledTask: (id) =>
         set((s) => ({
           scheduledTasks: s.scheduledTasks.filter((t) => t.id !== id),
-          // Keep the tracked time, just drop the link.
-          entries: s.entries.map((e) => (e.scheduledTaskId === id ? { ...e, scheduledTaskId: undefined } : e)),
+          // Remove the task's own tracked time too — deleting the card clears its hours.
+          // (Historical/billable entries aren't linked to a task, so they're untouched.)
+          entries: s.entries.filter((e) => e.scheduledTaskId !== id),
         })),
       moveTaskToDay: (id, date) =>
         set((s) => ({
