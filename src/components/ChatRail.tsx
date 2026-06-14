@@ -8,8 +8,10 @@ import { parseDateKey, monthShort, todayKey } from '../utils';
 type Row = ParsedTask & { state: 'pending' | 'approved'; reallocating?: boolean };
 type Msg = { id: string; role: 'user' | 'assistant'; text?: string; rows?: Row[] };
 
-const PRIO_LABEL: Record<TaskPriority, string> = { asap: 'ASAP', high: 'High', normal: 'Normal', low: 'Low' };
-const PRIO_CYCLE: TaskPriority[] = ['asap', 'high', 'normal', 'low'];
+// three urgency levels only: Low / Medium / High (store 'normal' = Medium)
+const PRIO_LABEL: Record<TaskPriority, string> = { asap: 'High', high: 'High', normal: 'Medium', low: 'Low' };
+const PRIO_LEVEL: Record<TaskPriority, number> = { asap: 3, high: 3, normal: 2, low: 1 };
+const PRIO_CYCLE: TaskPriority[] = ['high', 'normal', 'low'];
 
 let _id = 0;
 const uid = () => `m${Date.now().toString(36)}${_id++}`;
@@ -21,7 +23,17 @@ const Check = () => (
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
 );
 const CalIcon = () => (
-  <svg className="cal" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></svg>
+  <svg className="ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9h18M8 2.5v4M16 2.5v4" /></svg>
+);
+const FolderIc = () => (
+  <svg className="ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5a2 2 0 0 1 2-2h3.6l2 2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>
+);
+const Signal = ({ level }: { level: number }) => (
+  <svg className="sig" viewBox="0 0 24 24" width="15" height="15">
+    <rect x="3" y="14" width="4" height="6" rx="1" fill={level >= 1 ? '#161616' : '#d3d3d8'} />
+    <rect x="10" y="9.5" width="4" height="10.5" rx="1" fill={level >= 2 ? '#161616' : '#d3d3d8'} />
+    <rect x="17" y="5" width="4" height="15" rx="1" fill={level >= 3 ? '#161616' : '#d3d3d8'} />
+  </svg>
 );
 
 export function ChatRail() {
@@ -88,8 +100,6 @@ export function ChatRail() {
     patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, priority: PRIO_CYCLE[(PRIO_CYCLE.indexOf(cur) + 1) % 4] } : r)));
   const updateTitle = (msgId: string, id: string, title: string) =>
     patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, title } : r)));
-  const updateDesc = (msgId: string, id: string, description: string) =>
-    patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, description } : r)));
   const toggleRealloc = (msgId: string, id: string) =>
     patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, reallocating: !r.reallocating } : r)));
   const dismiss = (msgId: string, id: string) =>
@@ -110,24 +120,19 @@ export function ChatRail() {
         <button className="wk-tf-dismiss" onClick={() => dismiss(msgId, r.id)} aria-label="Dismiss">×</button>
         <input className="wk-tf-title-in" value={r.title} onChange={(e) => updateTitle(msgId, r.id, e.target.value)} aria-label="Task title" />
         {r.original && <div className="wk-tf-orig">{r.original}</div>}
-        {r.dateKey && (
-          <div className="wk-tf-when"><CalIcon />{r.deadline ? 'by ' : ''}{dateLabel(r.dateKey)}</div>
-        )}
-        <textarea
-          className="wk-tf-desc"
-          placeholder="Add a note…"
-          value={r.description || ''}
-          rows={r.description ? 2 : 1}
-          onChange={(e) => updateDesc(msgId, r.id, e.target.value)}
-        />
-        <div className="wk-tf-meta">
-          <button className="wk-tf-pill" onClick={() => toggleRealloc(msgId, r.id)} title="Change project">
-            <span>{p?.name || 'No project'}</span>
+        {r.description && <div className="wk-tf-desc">{r.description}</div>}
+        <div className="wk-tf-divider" />
+        <div className="wk-tf-foot">
+          <button className="wk-tf-fitem" onClick={() => toggleRealloc(msgId, r.id)} title="Change project">
+            <FolderIc /><span>{p?.name || 'No project'}</span>
           </button>
-          <button className={`wk-tf-pill prio-${r.priority}`} onClick={() => cyclePriority(msgId, r.id, r.priority)} title="Change urgency">
-            {PRIO_LABEL[r.priority]}
+          <button className="wk-tf-fitem prio" onClick={() => cyclePriority(msgId, r.id, r.priority)} title="Change urgency">
+            <Signal level={PRIO_LEVEL[r.priority]} /><b>{PRIO_LABEL[r.priority]}</b>
           </button>
-          <button className="wk-tf-approve" onClick={() => approve(msgId, r)} aria-label="Approve" title="Approve"><Check /></button>
+          {r.dateKey && (
+            <span className="wk-tf-fitem date"><CalIcon />{r.deadline ? 'by ' : ''}{dateLabel(r.dateKey)}</span>
+          )}
+          <button className="wk-tf-approve" onClick={() => approve(msgId, r)}>Approve</button>
         </div>
         {r.reallocating && (
           <div className="wk-tf-opts">

@@ -187,20 +187,19 @@ const HIGH_RE = /\b(important|high|priority|tomorrow|soon)\b|חשוב|מחר|ב�
  * deadline is — whichever is more urgent wins.
  */
 export function detectPriority(text: string, dateKey: string | undefined, today: Date): TaskPriority {
-  const order: TaskPriority[] = ['low', 'normal', 'high', 'asap'];
+  // three levels only: low / normal(=Medium) / high
+  const order: TaskPriority[] = ['low', 'normal', 'high'];
   let p: TaskPriority = 'normal';
   const bump = (to: TaskPriority) => { if (order.indexOf(to) > order.indexOf(p)) p = to; };
 
-  if (ASAP_RE.test(text)) bump('asap');
-  else if (HIGH_RE.test(text)) bump('high');
+  if (ASAP_RE.test(text) || HIGH_RE.test(text)) bump('high');
 
   // deadline proximity (calendar days from today)
   if (dateKey) {
     const due = new Date(dateKey + 'T00:00:00');
     const t0 = new Date(today); t0.setHours(0, 0, 0, 0);
     const days = Math.round((due.getTime() - t0.getTime()) / 86400000);
-    if (days <= 0) bump('asap');
-    else if (days <= 2) bump('high');
+    if (days <= 2) bump('high');
     else if (days <= 7) bump('normal');
     else bump('low');
   }
