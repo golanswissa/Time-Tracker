@@ -8,13 +8,24 @@ import {
   NavToday, NavClients, NavProjects, NavReports, NavInvoices, NavCategories, NavSettings,
 } from './icons';
 
-const NAV: { id: Route; label: string; Icon: () => JSX.Element }[] = [
-  { id: 'today', label: 'Today', Icon: NavToday },
-  { id: 'clients', label: 'Clients', Icon: NavClients },
-  { id: 'projects', label: 'Projects', Icon: NavProjects },
-  { id: 'reports', label: 'Reports', Icon: NavReports },
-  { id: 'invoices', label: 'Invoices', Icon: NavInvoices },
-  { id: 'tasks', label: 'Categories', Icon: NavCategories },
+type NavItem = { id: Route; label: string; Icon: () => JSX.Element };
+const SECTIONS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Track',
+    items: [
+      { id: 'today', label: 'Today', Icon: NavToday },
+      { id: 'projects', label: 'Projects', Icon: NavProjects },
+      { id: 'clients', label: 'Clients', Icon: NavClients },
+    ],
+  },
+  {
+    label: 'Manage',
+    items: [
+      { id: 'reports', label: 'Reports', Icon: NavReports },
+      { id: 'invoices', label: 'Invoices', Icon: NavInvoices },
+      { id: 'tasks', label: 'Categories', Icon: NavCategories },
+    ],
+  },
 ];
 
 interface Props {
@@ -34,25 +45,33 @@ export function AppShell({ route, onNavigate, children }: Props) {
       {/* left nav — cuts into the layout */}
       <aside className={`wk-sidenav ${navOpen ? 'on' : ''}`}>
         <div className="wk-sn-in">
-          <div className="wk-brand"><span className="mk">T</span> Tracker</div>
-          <div className="wk-nav">
-            {NAV.map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                className={`wk-nav-item ${route === id ? 'active' : ''}`}
-                onClick={() => onNavigate(id)}
-              >
-                <Icon /> {label}
-              </button>
-            ))}
-          </div>
+          <div className="wk-brand"><span className="wk-brand-mk">T</span><span className="wk-brand-tx">Tracker</span></div>
+          {SECTIONS.map((sec) => (
+            <div key={sec.label} className="wk-navgroup">
+              <div className="wk-navlabel">{sec.label}</div>
+              <div className="wk-nav">
+                {sec.items.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    className={`wk-nav-item ${route === id ? 'active' : ''}`}
+                    onClick={() => onNavigate(id)}
+                  >
+                    <span className="wk-nav-ic"><Icon /></span>
+                    <span className="wk-nav-lb">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
           <div className="wk-sn-sp" />
+          <div className="wk-navdiv" />
           <div className="wk-nav">
             <button
               className={`wk-nav-item ${route === 'settings' ? 'active' : ''}`}
               onClick={() => onNavigate('settings')}
             >
-              <NavSettings /> Settings
+              <span className="wk-nav-ic"><NavSettings /></span>
+              <span className="wk-nav-lb">Settings</span>
             </button>
           </div>
         </div>

@@ -2,20 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { actualSecondsForTask, sortTasks } from '../planner';
-import {
-  addDays, entrySeconds, formatHMS, monthShort, parseDateKey, startOfWeek, toDateKey, todayKey,
-} from '../utils';
+import { addDays, entrySeconds, formatHMS, parseDateKey, toDateKey } from '../utils';
 import type { ScheduledTask } from '../types';
-import { IconCal, IconPause, IconPencil, IconPlay } from '../components/icons';
+import { IconPause, IconPencil, IconPlay } from '../components/icons';
 
-const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export function DayView() {
   const scheduledTasks = useStore((s) => s.scheduledTasks);
   const entries = useStore((s) => s.entries);
   const projects = useStore((s) => s.projects);
   const clients = useStore((s) => s.clients);
-  const settings = useStore((s) => s.settings);
   const startTaskTimer = useStore((s) => s.startTaskTimer);
   const stopTimer = useStore((s) => s.stopTimer);
   const openEdit = useUI((s) => s.openEdit);
@@ -30,20 +28,29 @@ export function DayView() {
   }, []);
 
   const selectedKey = toDateKey(selectedDate);
-  const isToday = selectedKey === todayKey();
 
   const dayTasks = useMemo(
     () => scheduledTasks.filter((t) => t.date === selectedKey).slice().sort(sortTasks),
     [scheduledTasks, selectedKey]
   );
 
-  const weekKeys = useMemo(() => {
-    const start = startOfWeek(selectedDate, settings.weekStart);
-    return new Set(Array.from({ length: 7 }, (_, i) => toDateKey(addDays(start, i))));
-  }, [selectedDate, settings.weekStart]);
+  // ----- week strip (Sunday-first) + month total -----
+  const weekDays = useMemo(() => {
+    const start = addDays(selectedDate, -selectedDate.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(start, i);
+      const key = toDateKey(date);
+      const secs = entries.filter((e) => e.date === key).reduce((a, e) => a + entrySeconds(e, now), 0);
+      return { date, key, n: date.getDate(), secs };
+    });
+  }, [selectedDate, entries, now]);
 
-  const dayTotal = entries.filter((e) => e.date === selectedKey).reduce((a, e) => a + entrySeconds(e, now), 0);
-  const weekTotal = entries.filter((e) => weekKeys.has(e.date)).reduce((a, e) => a + entrySeconds(e, now), 0);
+  const monthTotal = useMemo(() => {
+    const m = selectedDate.getMonth(), y = selectedDate.getFullYear();
+    return entries
+      .filter((e) => { const dd = parseDateKey(e.date); return dd.getMonth() === m && dd.getFullYear() === y; })
+      .reduce((a, e) => a + entrySeconds(e, now), 0);
+  }, [selectedDate, entries, now]);
 
   const runningTaskId = entries.find((e) => e.isRunning)?.scheduledTaskId ?? null;
   const expandedId =
@@ -58,7 +65,8 @@ export function DayView() {
     return p ? clients.find((c) => c.id === p.clientId) : undefined;
   };
 
-  const shiftDay = (d: number) => setSelectedDate((cur) => addDays(cur, d));
+  const shiftWeek = (d: number) => setSelectedDate((cur) => addDays(cur, d));
+  const goReport = () => { window.location.hash = '#/reports'; };
   // Clicking the card body only expands/selects it — it does NOT start the timer.
   const expand = (t: ScheduledTask) => setActiveId(t.id);
   // The play/pause button is the only thing that starts/stops tracking.
@@ -68,26 +76,27 @@ export function DayView() {
     setActiveId(t.id);
   };
 
-  const d = parseDateKey(selectedKey);
-  const dateLabel = `${DOW[d.getDay()]}, ${d.getDate()} ${monthShort(d)}`;
-
   return (
     <div className="wk-col">
-      <div className="wk-head">
-        <div className="wk-daynav">
-          <button onClick={() => shiftDay(-1)} aria-label="Previous day">‹</button>
-          <button onClick={() => shiftDay(1)} aria-label="Next day">›</button>
-          <label className="wk-cal" title="Jump to a date">
-            <IconCal />
-            <input type="date" value={selectedKey} onChange={(e) => e.target.value && setSelectedDate(parseDateKey(e.target.value))} />
-          </label>
-          {!isToday && <button className="wk-today" onClick={() => setSelectedDate(new Date())}>Today</button>}
-        </div>
-        <div className="wk-title">
-          {isToday && <span className="lbl">Today: </span>}{dateLabel}
-        </div>
-        <div className="wk-totline mono">
-          <b>{formatHMS(dayTotal)}</b> today · {formatHMS(weekTotal)} this week
+      <div className="wk-week">
+        <button className="wk-wk-month" onClick={goReport} title="View this month’s report">
+          <span>{MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}</span>
+          <span className="vr"> · View report</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+        </button>
+        <div className="wk-wk-total">{formatHMS(monthTotal)}</div>
+        <div className="wk-wk-row">
+          <button className="wk-wk-arrow" onClick={() => shiftWeek(-7)} aria-label="Previous week">‹</button>
+          <div className="wk-wk-days">
+            {weekDays.map((wd, i) => (
+              <button key={wd.key} className="wk-wk-day" onClick={() => setSelectedDate(wd.date)}>
+                <span className="dow">{DOW1[i]}</span>
+                <span className={`num ${wd.key === selectedKey ? 'sel' : ''}`}>{wd.n}</span>
+                <span className="h">{formatHMS(wd.secs)}</span>
+              </button>
+            ))}
+          </div>
+          <button className="wk-wk-arrow" onClick={() => shiftWeek(7)} aria-label="Next week">›</button>
         </div>
       </div>
 

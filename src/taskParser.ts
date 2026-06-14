@@ -20,6 +20,8 @@ export interface ParsedTask {
   title: string;
   /** Original (pre-translation) text, kept for reference when it differed. */
   original?: string;
+  /** Explanation / note pulled from continuation lines under the task. */
+  description?: string;
   /** Best-guess project id (may be undefined if there are no projects). */
   projectId?: string;
   /** Auto-detected urgency. */
@@ -156,18 +158,22 @@ const HE_WORDS: Record<string, string> = {
 
 const hasHebrew = (s: string) => /[֐-׿]/.test(s);
 
-/** Translate Hebrew design-task text to English (phrase-first, then word-level). */
-export function translateTitle(s: string): string {
+/** Core Hebrew→English replacement (phrase-first, then word-level), no styling. */
+export function translateText(s: string): string {
   if (!hasHebrew(s)) return s;
   let t = s;
   for (const [he, en] of [...HE_PHRASES].sort((a, b) => b[0].length - a[0].length)) {
     if (t.includes(he)) t = t.split(he).join(en);
   }
-  // replace remaining runs of Hebrew letters word-by-word
   t = t.replace(/[א-ת]+/g, (w) => HE_WORDS[w] ?? w);
-  t = t.replace(/\s{2,}/g, ' ').replace(/\s+([-–])\s+/g, ' $1 ').trim();
+  return t.replace(/[ \t]{2,}/g, ' ').replace(/\s+([-–])\s+/g, ' $1 ').trim();
+}
+
+/** Translate a short task title (adds noun-flip + leading capital). */
+export function translateTitle(s: string): string {
+  if (!hasHebrew(s)) return s;
   // "page solution" → "solution page" (Hebrew puts the noun first; English flips it)
-  t = t.replace(/^(page|pages)\s+(?!\d)([^\s].*)$/i, '$2 $1');
+  const t = translateText(s).replace(/^(page|pages)\s+(?!\d)([^\s].*)$/i, '$2 $1');
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
@@ -206,13 +212,19 @@ export function detectPriority(text: string, dateKey: string | undefined, today:
 let counter = 0;
 const tmpId = () => `p${Date.now().toString(36)}${(counter++).toString(36)}`;
 
+const MARKER_RE = /^\s*(\d+[.)]|[-*•·–—])\s+/;
+
 export function parseTasks(text: string, projects: Project[], today = new Date()): ParsedTask[] {
   const lines = text.split(/\r?\n/);
+  // If the message uses list markers, unmarked lines are treated as notes
+  // (descriptions) of the task above them; otherwise every line is its own task.
+  const usesMarkers = lines.some((l) => MARKER_RE.test(l));
   const out: ParsedTask[] = [];
 
   let curDate: string | undefined;
   let curDeadline: string | undefined;
   let curLabel: string | undefined;
+  let current: ParsedTask | null = null;
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
@@ -224,27 +236,35 @@ export function parseTasks(text: string, projects: Project[], today = new Date()
       curDate = d;
       curDeadline = header.by ? d : undefined;
       curLabel = header.label;
+      current = null;
       continue;
     }
 
-    const cleaned = stripMarkers(line);
-    if (!cleaned || cleaned.length < 2) continue;
-
-    // guess project off the ORIGINAL (Hebrew keywords matter), then translate
-    const guess = guessProject(cleaned, projects);
-    const title = translateTitle(cleaned);
-    const priority = detectPriority(`${curLabel ?? ''} ${cleaned}`, curDeadline, today);
-    out.push({
-      id: tmpId(),
-      title,
-      original: title !== cleaned ? cleaned : undefined,
-      projectId: guess?.projectId,
-      priority,
-      reason: guess?.reason,
-      dateKey: curDate,
-      deadline: curDeadline,
-      sectionLabel: curLabel,
-    });
+    const isTaskLine = usesMarkers ? MARKER_RE.test(line) : true;
+    if (isTaskLine) {
+      const cleaned = stripMarkers(line);
+      if (!cleaned || cleaned.length < 2) continue;
+      // guess project off the ORIGINAL (Hebrew keywords matter), then translate
+      const guess = guessProject(cleaned, projects);
+      const title = translateTitle(cleaned);
+      const priority = detectPriority(`${curLabel ?? ''} ${cleaned}`, curDeadline, today);
+      current = {
+        id: tmpId(),
+        title,
+        original: title !== cleaned ? cleaned : undefined,
+        projectId: guess?.projectId,
+        priority,
+        reason: guess?.reason,
+        dateKey: curDate,
+        deadline: curDeadline,
+        sectionLabel: curLabel,
+      };
+      out.push(current);
+    } else if (current) {
+      // a continuation line → append to the current task's description
+      const piece = translateText(stripMarkers(line));
+      current.description = current.description ? `${current.description}\n${piece}` : piece;
+    }
   }
 
   return out;
