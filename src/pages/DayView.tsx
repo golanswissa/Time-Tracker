@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { actualSecondsForTask, sortTasks } from '../planner';
-import { addDays, entrySeconds, formatHMS, parseDateKey, toDateKey } from '../utils';
+import { addDays, entrySeconds, formatHMS, parseDateKey, toDateKey, todayKey } from '../utils';
 import type { ScheduledTask } from '../types';
 import { IconPause, IconPencil, IconPlay } from '../components/icons';
 
@@ -65,7 +65,14 @@ export function DayView() {
     return p ? clients.find((c) => c.id === p.clientId) : undefined;
   };
 
-  const shiftWeek = (d: number) => setSelectedDate((cur) => addDays(cur, d));
+  const isToday = selectedKey === todayKey();
+  const shiftWeek = (d: number) => setSelectedDate((cur) => {
+    const next = addDays(cur, d);
+    // if the target week contains today, land on today (not the same weekday)
+    const today = new Date();
+    if (toDateKey(addDays(next, -next.getDay())) === toDateKey(addDays(today, -today.getDay()))) return today;
+    return next;
+  });
   const goReport = () => { window.location.hash = '#/reports'; };
   // Clicking the card body only expands/selects it — it does NOT start the timer.
   const expand = (t: ScheduledTask) => setActiveId(t.id);
@@ -79,6 +86,7 @@ export function DayView() {
   return (
     <div className="wk-col">
       <div className="wk-week">
+        {!isToday && <button className="wk-wk-today" onClick={() => setSelectedDate(new Date())}>Today</button>}
         <button className="wk-wk-month" onClick={goReport} title="View this month’s report">
           <span>{MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}</span>
           <span className="vr"> · View report</span>

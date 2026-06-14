@@ -97,7 +97,11 @@ export function ChatRail() {
   const setProject = (msgId: string, id: string, projectId: string) =>
     patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, projectId, reallocating: false } : r)));
   const cyclePriority = (msgId: string, id: string, cur: TaskPriority) =>
-    patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, priority: PRIO_CYCLE[(PRIO_CYCLE.indexOf(cur) + 1) % 4] } : r)));
+    patchRows(msgId, (rows) => rows.map((r) => {
+      if (r.id !== id) return r;
+      const i = PRIO_CYCLE.indexOf(cur);
+      return { ...r, priority: PRIO_CYCLE[(i + 1) % PRIO_CYCLE.length] };
+    }));
   const updateTitle = (msgId: string, id: string, title: string) =>
     patchRows(msgId, (rows) => rows.map((r) => (r.id === id ? { ...r, title } : r)));
   const toggleRealloc = (msgId: string, id: string) =>

@@ -1241,8 +1241,10 @@ a { color: inherit; text-decoration: none; }
 
 /* week-strip header — borderless, content stretched to the edges, lifted so the
    month label lines up with the top-bar + button */
-.wk-week{ padding:15px 0 14px; margin:-80px 0 16px; }
+.wk-week{ position:relative; padding:15px 0 14px; margin:-80px 0 16px; }
 @media (max-width:760px){ .wk-week{ margin-top:8px; } }
+.wk-wk-today{ position:absolute; top:11px; right:0; border:1px solid var(--gray-100); background:#fff; border-radius:999px; font-size:11.5px; padding:4px 12px; color:var(--text-muted); cursor:pointer; z-index:1; }
+.wk-wk-today:hover{ border-color:var(--text); color:var(--text); }
 .wk-wk-month{ display:flex; align-items:center; justify-content:center; gap:5px; width:fit-content; margin:0 auto; background:none; border:none; cursor:pointer; font-size:11.5px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; color:var(--text-muted); padding:5px 12px; border-radius:999px; transition:background .14s; }
 .wk-wk-month:hover{ background:#f1f1ef; color:var(--text); }
 .wk-wk-month .vr{ display:none; }
@@ -1317,20 +1319,25 @@ a { color: inherit; text-decoration: none; }
 .wk-tf-desc{ font-size:13.5px; line-height:1.5; color:#44454b; margin-top:9px; white-space:pre-line; }
 
 .wk-tf-divider{ height:1px; background:var(--gray-100); margin:14px 0 0; }
-.wk-tf-foot{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; padding-top:13px; }
-.wk-tf-fitem{ display:inline-flex; align-items:center; gap:7px; background:none; border:none; padding:0; font-size:13.5px; color:var(--text); cursor:pointer; white-space:nowrap; }
-.wk-tf-fitem .ic{ color:#9a9ba1; flex-shrink:0; }
-.wk-tf-fitem .sig{ flex-shrink:0; }
-.wk-tf-fitem.prio b{ font-weight:600; }
-.wk-tf-fitem.date{ cursor:default; color:var(--text-muted); }
-.wk-tf-approve{ margin-left:auto; flex-shrink:0; background:var(--wk-yellow); color:#3a3500; border:none; border-radius:6px; padding:9px 18px; font-size:13.5px; font-weight:600; cursor:pointer; transition:filter .12s; }
-.wk-tf-approve:hover{ filter:brightness(.96); }
+.wk-tf-foot{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding-top:13px; }
+/* all footer controls share the "Today" pill style; only Approve is yellow */
+.wk-tf-fitem{ display:inline-flex; align-items:center; gap:6px; border:1px solid var(--gray-100); background:#fff; border-radius:999px; padding:4px 11px; font-size:11.5px; color:var(--text-muted); cursor:pointer; white-space:nowrap; }
+.wk-tf-fitem:hover{ border-color:var(--text); color:var(--text); }
+.wk-tf-fitem .ic{ width:13px; height:13px; color:#9a9ba1; flex-shrink:0; }
+.wk-tf-fitem:hover .ic{ color:var(--text); }
+.wk-tf-fitem .sig{ width:13px; height:13px; flex-shrink:0; }
+.wk-tf-fitem.prio b{ font-weight:600; color:var(--text); }
+.wk-tf-fitem.date{ cursor:default; }
+.wk-tf-fitem.date:hover{ border-color:var(--gray-100); color:var(--text-muted); }
+.wk-tf-fitem.date:hover .ic{ color:#9a9ba1; }
+.wk-tf-approve{ margin-left:auto; flex-shrink:0; border:1px solid var(--wk-yellow); background:var(--wk-yellow); color:#3a3500; border-radius:999px; padding:4px 14px; font-size:11.5px; font-weight:600; cursor:pointer; transition:filter .12s; }
+.wk-tf-approve:hover{ filter:brightness(.95); }
 
-.wk-tf-opts{ margin-top:11px; display:flex; flex-direction:column; gap:5px; }
-.wk-tf-opt{ display:flex; align-items:center; gap:9px; text-align:left; border:1px solid var(--gray-100); background:#fff; border-radius:2px; padding:9px 11px; font-size:13px; cursor:pointer; }
-.wk-tf-opt:hover{ border-color:#c9c9cf; }
-.wk-tf-opt.sel{ border-color:var(--ink,#161616); }
-.wk-tf-opt i{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.wk-tf-opts{ margin-top:11px; display:flex; flex-wrap:wrap; gap:7px; }
+.wk-tf-opt{ display:inline-flex; align-items:center; gap:7px; border:1px solid var(--gray-100); background:#fff; border-radius:999px; padding:5px 11px; font-size:12px; color:var(--text-muted); cursor:pointer; white-space:nowrap; }
+.wk-tf-opt:hover{ border-color:var(--text); color:var(--text); }
+.wk-tf-opt.sel{ border-color:var(--ink,#161616); color:var(--text); font-weight:600; }
+.wk-tf-opt i{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
 /* approved state */
 .wk-tf-card.ok{ background:#f6faf7; border-color:#dcebe1; padding:13px 16px; animation:none; }
