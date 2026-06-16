@@ -16,12 +16,14 @@ export function DayView() {
   const clients = useStore((s) => s.clients);
   const startTaskTimer = useStore((s) => s.startTaskTimer);
   const stopTimer = useStore((s) => s.stopTimer);
+  const setTaskStatus = useStore((s) => s.setTaskStatus);
   const openEdit = useUI((s) => s.openEdit);
   const openCreate = useUI((s) => s.openCreate);
   const setDayDate = useUI((s) => s.setDayDate);
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -29,13 +31,20 @@ export function DayView() {
   }, []);
 
   const selectedKey = toDateKey(selectedDate);
+  const isToday = selectedKey === todayKey();
   // keep the shell's "+" button creating tasks on the day you're looking at
   useEffect(() => { setDayDate(selectedKey); }, [selectedKey, setDayDate]);
 
-  const dayTasks = useMemo(
-    () => scheduledTasks.filter((t) => t.date === selectedKey).slice().sort(sortTasks),
-    [scheduledTasks, selectedKey]
+  // Tasks "in play" for the day: scheduled on it, PLUS — only on today —
+  // unfinished (Pending/Working/Under-review) tasks from earlier days, rolled
+  // forward so nothing falls off. Done tasks don't roll.
+  const relevant = useMemo(
+    () => scheduledTasks.filter((t) =>
+      t.date === selectedKey || (isToday && t.date < selectedKey && t.status !== 'done')),
+    [scheduledTasks, selectedKey, isToday]
   );
+  const dayTasks = useMemo(() => relevant.filter((t) => t.status !== 'blocked').slice().sort(sortTasks), [relevant]);
+  const reviewTasks = useMemo(() => relevant.filter((t) => t.status === 'blocked'), [relevant]);
 
   // ----- week strip (Sunday-first) + month total -----
   const weekDays = useMemo(() => {
@@ -68,7 +77,6 @@ export function DayView() {
     return p ? clients.find((c) => c.id === p.clientId) : undefined;
   };
 
-  const isToday = selectedKey === todayKey();
   const shiftWeek = (d: number) => setSelectedDate((cur) => {
     const next = addDays(cur, d);
     // if the target week contains today, land on today (not the same weekday)
@@ -79,12 +87,14 @@ export function DayView() {
   const goReport = () => { window.location.hash = '#/reports'; };
   // Clicking the card body only expands/selects it — it does NOT start the timer.
   const expand = (t: ScheduledTask) => setActiveId(t.id);
-  // The play/pause button is the only thing that starts/stops tracking.
+  // The play/pause button starts/stops tracking — and starting marks it Working.
   const onPlay = (t: ScheduledTask) => {
     if (runningTaskId === t.id) stopTimer();
-    else startTaskTimer(t.id);
+    else { startTaskTimer(t.id); setTaskStatus(t.id, 'doing'); }
     setActiveId(t.id);
   };
+  // Pull a task back out of review → Working, surfaced at the top of the list.
+  const reactivate = (t: ScheduledTask) => { setTaskStatus(t.id, 'doing'); setActiveId(t.id); setReviewOpen(false); };
 
   return (
     <div className="wk-col">
@@ -169,6 +179,29 @@ export function DayView() {
           );
         })}
       </div>
+
+      {reviewTasks.length > 0 && (
+        <div className="wk-rev">
+          <button className="wk-rev-head" onClick={() => setReviewOpen((o) => !o)}>
+            <span className="wk-rev-dot" />
+            <span className="wk-rev-lbl">Under review · {reviewTasks.length}</span>
+            <svg className={`wk-rev-cv ${reviewOpen ? 'open' : ''}`} viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+          </button>
+          {reviewOpen && (
+            <div className="wk-rev-list">
+              {reviewTasks.map((t) => (
+                <div key={t.id} className="wk-rev-row">
+                  <div className="wk-rev-tx">
+                    <div className="nm">{t.title}</div>
+                    <div className="pj">{getProject(t.projectId)?.name || getClient(t)?.name || 'No project'}</div>
+                  </div>
+                  <button className="wk-rev-go" onClick={() => reactivate(t)}>Reactivate</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

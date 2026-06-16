@@ -1,5 +1,21 @@
-import type { Entry, ScheduledTask, TaskPriority, TaskKind } from './types';
+import type { Entry, ScheduledTask, TaskPriority, TaskStatus, TaskKind } from './types';
 import { entrySeconds } from './utils';
+
+/**
+ * Task lifecycle — the user's four states, mapped onto the stored values.
+ * Pending(todo) → Working(doing) → Under review(blocked) → Done(done).
+ * Pending + Working stay in the day list and roll forward; Under review parks
+ * in the bottom banner; Done leaves the list.
+ */
+export const STATUS_META: Record<TaskStatus, { label: string; c: string }> = {
+  todo: { label: 'Pending', c: '#9aa0a6' },
+  doing: { label: 'Working', c: '#a9870b' },
+  blocked: { label: 'Under review', c: '#b4502a' },
+  done: { label: 'Done', c: '#0f7a45' },
+};
+export const STATUS_ORDER: TaskStatus[] = ['todo', 'doing', 'blocked', 'done'];
+/** Statuses that keep a task active in the day list (and rolling forward). */
+export const ACTIVE_STATUSES: TaskStatus[] = ['todo', 'doing'];
 
 export const PRIORITY_ORDER: Record<TaskPriority, number> = {
   asap: 0,

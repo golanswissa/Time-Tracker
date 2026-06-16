@@ -1264,6 +1264,20 @@ a { color: inherit; text-decoration: none; }
 
 .wk-list{ display:flex; flex-direction:column; gap:12px; }
 .wk-empty{ text-align:center; padding:44px 0; color:var(--text-faint); font-size:13px; }
+/* under-review banner (collapsed, at the bottom of the day) */
+.wk-rev{ margin-top:18px; }
+.wk-rev-head{ display:flex; align-items:center; gap:9px; width:100%; background:#faf8ee; border:1px solid #ece3c4; border-radius:10px; padding:11px 14px; font-size:13px; font-weight:600; color:#7c6a23; cursor:pointer; }
+.wk-rev-head:hover{ background:#f6f3e6; }
+.wk-rev-dot{ width:8px; height:8px; border-radius:50%; background:#b4502a; flex-shrink:0; }
+.wk-rev-cv{ margin-left:auto; color:#b6ab86; transition:transform .18s; }
+.wk-rev-cv.open{ transform:rotate(180deg); }
+.wk-rev-list{ display:flex; flex-direction:column; gap:8px; margin-top:8px; animation:wkCardExpand .24s cubic-bezier(.34,1.3,.5,1); }
+.wk-rev-row{ display:flex; align-items:center; gap:12px; border:1px solid var(--gray-100); border-radius:10px; padding:11px 14px; background:#fff; }
+.wk-rev-tx{ min-width:0; }
+.wk-rev-tx .nm{ font-size:14px; font-weight:600; letter-spacing:-.1px; }
+.wk-rev-tx .pj{ font-size:11.5px; color:var(--text-faint); margin-top:1px; }
+.wk-rev-go{ margin-left:auto; flex-shrink:0; border:1px solid var(--gray-100); background:#fff; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:600; color:var(--text); cursor:pointer; }
+.wk-rev-go:hover{ border-color:var(--text); }
 .wk-pp{ width:34px; height:34px; border-radius:50%; flex-shrink:0; border:1px solid var(--gray-100); background:#fff; color:var(--text); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; } .wk-pp:hover{ border-color:var(--text); } .wk-pp svg{ width:13px; height:13px; }
 .wk-ed{ width:34px; height:34px; border-radius:50%; flex-shrink:0; border:1px solid var(--gray-100); background:transparent; color:var(--text); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; } .wk-ed:hover{ border-color:var(--text); } .wk-ed svg{ width:13px; height:13px; }
 .wk-card.exp.run .wk-ed{ border-color:rgba(0,0,0,.18); } .wk-card.exp.run .wk-ed:hover{ border-color:rgba(0,0,0,.45); }
@@ -1375,6 +1389,14 @@ a { color: inherit; text-decoration: none; }
 .wk-panel{ position:fixed; top:0; right:0; height:100%; width:450px; max-width:94vw; background:#fff; box-shadow:-12px 0 34px -12px rgba(0,0,0,.26); z-index:31; padding:22px 26px 24px; display:flex; flex-direction:column; gap:18px; overflow:auto; transform:translateX(100%); transition:transform .24s cubic-bezier(.22,1,.36,1); }
 .wk-panel.on{ transform:none; }
 .wk-ptop{ display:flex; align-items:center; gap:16px; } .wk-px{ margin-left:auto; border:none; background:none; font-size:21px; color:var(--text-faint); cursor:pointer; }
+/* segmented status / urgency selectors */
+.wk-pseclbl{ font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:#abacb2; }
+.wk-pseclbl-2{ margin-top:14px; display:block; }
+.wk-seg{ display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
+.wk-segb{ display:inline-flex; align-items:center; gap:7px; border:1px solid var(--gray-100); background:#fff; border-radius:999px; padding:7px 13px; font-size:12.5px; font-weight:500; color:var(--text-muted); cursor:pointer; transition:border-color .12s, background .12s; }
+.wk-segb:hover{ border-color:#c9c9cf; }
+.wk-segb.on{ font-weight:600; }
+.wk-segb i{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .wk-cs{ position:relative; } .wk-chip{ display:inline-flex; align-items:center; gap:7px; border:none; background:none; font-size:14px; font-weight:600; cursor:pointer; padding:3px 0; } .wk-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
 .wk-menu{ position:absolute; top:100%; left:-6px; margin-top:6px; background:#fff; border:1px solid var(--gray-100); border-radius:9px; box-shadow:0 10px 28px -10px rgba(0,0,0,.28); padding:5px; min-width:140px; z-index:32; }
 .wk-mi{ display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; } .wk-mi:hover{ background:#f3f3f4; }

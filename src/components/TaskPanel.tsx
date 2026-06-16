@@ -1,23 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
-import { actualSecondsForTask } from '../planner';
+import { actualSecondsForTask, STATUS_META, STATUS_ORDER } from '../planner';
 import { formatHMS, todayKey } from '../utils';
 import type { TaskKind, TaskPriority, TaskStatus } from '../types';
 import { IconPlayS, IconPauseS, IconTrash } from './icons';
 
-const PRIO: { v: TaskPriority; label: string; c: string }[] = [
-  { v: 'asap', label: 'ASAP', c: '#b4502a' },
-  { v: 'high', label: 'High', c: '#b45309' },
-  { v: 'normal', label: 'Normal', c: '#6b7280' },
-  { v: 'low', label: 'Low', c: '#a1a1aa' },
+// urgency — three levels (asap collapses into High)
+const PRIO3: { v: TaskPriority; label: string; c: string }[] = [
+  { v: 'high', label: 'High', c: '#b4502a' },
+  { v: 'normal', label: 'Medium', c: '#2563eb' },
+  { v: 'low', label: 'Low', c: '#0e8a7d' },
 ];
-const STATUS: { v: TaskStatus; label: string; c: string; i: string }[] = [
-  { v: 'todo', label: 'Todo', c: '#9aa0a6', i: '○' },
-  { v: 'doing', label: 'Doing', c: '#a9870b', i: '◑' },
-  { v: 'done', label: 'Done', c: '#0f7a45', i: '✓' },
-  { v: 'blocked', label: 'Blocked', c: '#b4502a', i: '⊘' },
-];
+const isPrio = (v: TaskPriority, cur: TaskPriority) => cur === v || (v === 'high' && cur === 'asap');
 const KINDS: TaskKind[] = ['design', 'print', 'meeting', 'email', 'admin'];
 
 const parseHMS = (v: string): number => {
@@ -58,13 +53,11 @@ export function TaskPanel() {
   const running = !!task && entries.some((e) => e.isRunning && e.scheduledTaskId === task.id);
 
   const [form, setForm] = useState<Form>(blankForm);
-  const [menu, setMenu] = useState<'status' | 'prio' | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
   // Populate only on open (keep the content during the slide-out close).
   useEffect(() => {
     if (!taskPanel) return;
-    setMenu(null);
     if (task) {
       setForm({
         title: task.title, clientId: task.clientId || '', projectId: task.projectId || '',
@@ -121,43 +114,35 @@ export function TaskPanel() {
   };
   const onInlineTimer = () => { if (task) running ? stopTimer() : startTaskTimer(task.id); };
 
-  const sMeta = STATUS.find((s) => s.v === form.status)!;
-  const pMeta = PRIO.find((p) => p.v === form.priority)!;
-
   return (
     <>
       <div className={`wk-ov ${open ? 'on' : ''}`} onClick={closePanel} />
-      <aside className={`wk-panel ${open ? 'on' : ''}`} onClick={() => setMenu(null)} aria-hidden={!open}>
-        <div className="wk-ptop" onClick={(e) => e.stopPropagation()}>
-          <div className="wk-cs">
-            <button className="wk-chip" style={{ color: sMeta.c }} onClick={() => setMenu(menu === 'status' ? null : 'status')}>
-              <span className="wk-dot" style={{ background: sMeta.c }} /> {sMeta.i} {sMeta.label}
-            </button>
-            {menu === 'status' && (
-              <div className="wk-menu">
-                {STATUS.map((o) => (
-                  <div key={o.v} className="wk-mi" style={{ color: o.c }} onClick={() => { set({ status: o.v }); setMenu(null); }}>
-                    <span className="wk-dot" style={{ background: o.c }} /> {o.i} {o.label}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="wk-cs">
-            <button className="wk-chip" style={{ color: pMeta.c }} onClick={() => setMenu(menu === 'prio' ? null : 'prio')}>
-              <span className="wk-dot" style={{ background: pMeta.c }} /> {pMeta.label}
-            </button>
-            {menu === 'prio' && (
-              <div className="wk-menu">
-                {PRIO.map((o) => (
-                  <div key={o.v} className="wk-mi" style={{ color: o.c }} onClick={() => { set({ priority: o.v }); setMenu(null); }}>
-                    <span className="wk-dot" style={{ background: o.c }} /> {o.label}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      <aside className={`wk-panel ${open ? 'on' : ''}`} aria-hidden={!open}>
+        <div className="wk-ptop">
+          <span className="wk-pseclbl">Status</span>
           <button className="wk-px" onClick={closePanel} aria-label="Close">×</button>
+        </div>
+        <div className="wk-seg">
+          {STATUS_ORDER.map((v) => {
+            const m = STATUS_META[v];
+            const on = form.status === v;
+            return (
+              <button key={v} className={`wk-segb ${on ? 'on' : ''}`} style={on ? { color: m.c, borderColor: m.c, background: `${m.c}14` } : undefined} onClick={() => set({ status: v })}>
+                <i style={{ background: m.c }} />{m.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="wk-pseclbl wk-pseclbl-2">Urgency</div>
+        <div className="wk-seg">
+          {PRIO3.map((p) => {
+            const on = isPrio(p.v, form.priority);
+            return (
+              <button key={p.v} className={`wk-segb ${on ? 'on' : ''}`} style={on ? { color: p.c, borderColor: p.c, background: `${p.c}14` } : undefined} onClick={() => set({ priority: p.v })}>
+                <i style={{ background: p.c }} />{p.label}
+              </button>
+            );
+          })}
         </div>
 
         <input ref={titleRef} className="wk-ptitle" value={form.title} placeholder="Task title"

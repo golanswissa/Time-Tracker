@@ -2,17 +2,10 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { ProjectModal } from '../components/ProjectModal';
-import { actualSecondsForTask, sortTasks } from '../planner';
+import { actualSecondsForTask, sortTasks, STATUS_META } from '../planner';
 import { entrySeconds, formatHMS, monthShort, parseDateKey } from '../utils';
-import type { Project, TaskStatus } from '../types';
+import type { Project } from '../types';
 import { IconPlus, IconPencil } from '../components/icons';
-
-const STATUS_C: Record<TaskStatus, { c: string; label: string }> = {
-  todo: { c: '#9aa0a6', label: 'Todo' },
-  doing: { c: '#a9870b', label: 'Doing' },
-  done: { c: '#0f7a45', label: 'Done' },
-  blocked: { c: '#b4502a', label: 'Blocked' },
-};
 
 export function ProjectsView() {
   const projects = useStore((s) => s.projects);
@@ -89,7 +82,7 @@ export function ProjectsView() {
           {tasks.length === 0 && <div className="wk-empty">No tasks yet — add the first one.</div>}
           {tasks.map((t) => {
             const tracked = actualSecondsForTask(entries, t.id, now);
-            const sc = STATUS_C[t.status];
+            const sc = STATUS_META[t.status];
             const d = parseDateKey(t.date);
             const isRun = runningTask?.id === t.id;
             return (
