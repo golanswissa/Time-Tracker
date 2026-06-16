@@ -85,8 +85,9 @@ export function DayView() {
     return next;
   });
   const goReport = () => { window.location.hash = '#/reports'; };
-  // Clicking the card body only expands/selects it — it does NOT start the timer.
-  const expand = (t: ScheduledTask) => setActiveId(t.id);
+  // Clicking anywhere on the card body opens the side drawer (and selects it).
+  // The play/pause + edit buttons stop propagation, so they keep their own actions.
+  const expand = (t: ScheduledTask) => { setActiveId(t.id); openEdit(t.id); };
   // The play/pause button starts/stops tracking — and starting marks it Working.
   const onPlay = (t: ScheduledTask) => {
     if (runningTaskId === t.id) stopTimer();

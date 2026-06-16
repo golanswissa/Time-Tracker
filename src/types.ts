@@ -89,6 +89,8 @@ export interface ScheduledTask {
   id: string;
   title: string;
   description?: string;
+  /** Free-form notes / links. Lives only in the side panel, never on the card. */
+  notes?: string;
   clientId?: string;
   projectId?: string;
   /** Day this task is scheduled on (YYYY-MM-DD, local). */

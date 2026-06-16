@@ -25,6 +25,45 @@ export const IconPauseS = () => <svg viewBox="0 0 24 24" width={13} height={13} 
 export const IconPencil = () => <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>;
 export const IconTrash = () => <svg viewBox="0 0 24 24" width={15} height={15} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>;
 
+// ---- property pill icons (status / priority / kind) ----
+export const IconStatus = ({ status, size = 15 }: { status: string; size?: number }) => {
+  if (status === 'done') return (
+    <svg viewBox="0 0 24 24" width={size} height={size}><circle cx="12" cy="12" r="9" fill="currentColor" /><path d="M7.8 12.3l2.6 2.6 5.4-5.8" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  );
+  if (status === 'doing') return (
+    <svg viewBox="0 0 24 24" width={size} height={size}><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" strokeWidth="2.4" /><path d="M12 12 L12 3.4 A8.6 8.6 0 0 1 12 20.6 Z" fill="currentColor" /></svg>
+  );
+  if (status === 'blocked') return (
+    <svg viewBox="0 0 24 24" width={size} height={size}><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeDasharray="2.7 2.7" /></svg>
+  );
+  return ( // todo
+    <svg viewBox="0 0 24 24" width={size} height={size}><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" strokeWidth="2.4" /></svg>
+  );
+};
+
+export const IconPriority = ({ level, size = 15 }: { level: string; size?: number }) => {
+  const n = level === 'high' || level === 'asap' ? 3 : level === 'normal' ? 2 : 1;
+  const bars = [{ x: 4, h: 7 }, { x: 10, h: 11 }, { x: 16, h: 15 }];
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size}>
+      {bars.map((b, i) => (
+        <rect key={i} x={b.x} y={20 - b.h} width="3.6" height={b.h} rx="1.2" fill="currentColor" opacity={i < n ? 1 : 0.25} />
+      ))}
+    </svg>
+  );
+};
+
+export const IconKind = ({ kind, size = 14 }: { kind: string; size?: number }) => {
+  const c = { viewBox: '0 0 24 24', width: size, height: size, fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  switch (kind) {
+    case 'print': return <svg {...c}><path d="M6.5 9V3.5h11V9" /><rect x="4" y="9" width="16" height="8" rx="2" /><path d="M7 14h10v6.5H7z" /></svg>;
+    case 'meeting': return <svg {...c}><circle cx="9" cy="8.5" r="3" /><path d="M3.8 19a5.4 5.4 0 0 1 10.4 0" /><path d="M16 6a3 3 0 0 1 0 5" /><path d="M20.4 19a5 5 0 0 0-3.1-4.6" /></svg>;
+    case 'email': return <svg {...c}><rect x="3" y="5.5" width="18" height="13" rx="2" /><path d="m3.6 7 8.4 5.6L20.4 7" /></svg>;
+    case 'admin': return <svg {...c}><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5a7 7 0 0 0 .1-1z" /></svg>;
+    default: return <svg {...c}><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>; // design
+  }
+};
+
 // nav icons
 export const NavToday = () => <S d="M3 10.5 12 3l9 7.5|M5 9.5V21h14V9.5|M9.5 21v-5h5v5" />;
 export const NavClients = () => <svg viewBox="0 0 24 24" width={17} height={17} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.5a3 3 0 0 1 0 5.4"/><path d="M20.5 20a5 5 0 0 0-3.5-4.7"/></svg>;

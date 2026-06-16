@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { actualSecondsForTask, actualSecondsForTaskOnDay, STATUS_META, STATUS_ORDER } from '../planner';
 import { dayShort, formatHMS, monthShort, parseDateKey, todayKey } from '../utils';
 import type { TaskKind, TaskPriority, TaskStatus } from '../types';
-import { IconPlayS, IconPauseS, IconTrash } from './icons';
+import { IconPlayS, IconPauseS, IconTrash, IconStatus, IconPriority, IconKind, IconCal } from './icons';
+import type { ReactNode } from 'react';
 
 // urgency — three levels (asap collapses into High)
 const PRIO3: { v: TaskPriority; label: string; c: string }[] = [
@@ -12,7 +13,6 @@ const PRIO3: { v: TaskPriority; label: string; c: string }[] = [
   { v: 'normal', label: 'Medium', c: '#2563eb' },
   { v: 'low', label: 'Low', c: '#0e8a7d' },
 ];
-const isPrio = (v: TaskPriority, cur: TaskPriority) => cur === v || (v === 'high' && cur === 'asap');
 const KINDS: TaskKind[] = ['design', 'print', 'meeting', 'email', 'admin'];
 
 const parseHMS = (v: string): number => {
@@ -23,13 +23,100 @@ const parseHMS = (v: string): number => {
 
 interface Form {
   title: string; clientId: string; projectId: string; date: string; deadline: string;
-  kind: TaskKind; estimate: string; hours: string; description: string;
+  kind: TaskKind; estimate: string; hours: string; description: string; notes: string;
   status: TaskStatus; priority: TaskPriority;
 }
 const blankForm = (): Form => ({
   title: '', clientId: '', projectId: '', date: todayKey(), deadline: '',
-  kind: 'design', estimate: '', hours: '0:00', description: '', status: 'todo', priority: 'normal',
+  kind: 'design', estimate: '', hours: '0:00', description: '', notes: '', status: 'todo', priority: 'normal',
 });
+
+/** Textarea that grows to fit its content — no inner scrollbar, no fixed height. */
+function AutoTextarea({ value, onChange, placeholder, className, rows = 1, inputRef, singleLine }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
+  className?: string; rows?: number; inputRef?: React.RefObject<HTMLTextAreaElement>;
+  /** Block Enter from inserting newlines (e.g. for the title). */
+  singleLine?: boolean;
+}) {
+  const innerRef = useRef<HTMLTextAreaElement>(null);
+  const ref = inputRef ?? innerRef;
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, ref]);
+  return (
+    <textarea ref={ref} className={className} value={value} placeholder={placeholder} rows={rows}
+      onKeyDown={singleLine ? (e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } } : undefined}
+      onChange={(e) => onChange(e.target.value)} />
+  );
+}
+
+/** "Mon 15 Jun" from a YYYY-MM-DD key. */
+const fmtDay = (key: string): string => {
+  const d = parseDateKey(key);
+  return `${dayShort(d)} ${d.getDate()} ${monthShort(d)}`;
+};
+
+/** Calendar pill — shows the date (or placeholder), opens the native picker on click. */
+function DatePill({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const open = () => {
+    const el = ref.current; if (!el) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const anyEl = el as any;
+    if (typeof anyEl.showPicker === 'function') { try { anyEl.showPicker(); return; } catch { /* fall through */ } }
+    el.focus();
+  };
+  return (
+    <span className="wk-datepill">
+      <button type="button" className={`wk-pill ${value ? '' : 'muted'}`} onClick={open}>
+        <span className="wk-pill-ic-muted"><IconCal /></span>
+        <span>{value ? fmtDay(value) : placeholder}</span>
+      </button>
+      <input ref={ref} type="date" className="wk-datehidden" value={value} onChange={(e) => onChange(e.target.value)} tabIndex={-1} />
+    </span>
+  );
+}
+
+interface PillOption { value: string; label: string; icon?: ReactNode }
+
+/** Compact property pill — shows the current value's icon + label, opens a menu to change it. */
+function PillSelect({ value, options, onChange }: {
+  value: string; options: PillOption[]; onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+  const sel = options.find((o) => o.value === value) || options[0];
+  return (
+    <div className="wk-pill-wrap" ref={ref}>
+      <button type="button" className={`wk-pill ${open ? 'open' : ''}`} onClick={() => setOpen((o) => !o)}>
+        {sel?.icon && <span className="wk-pill-ic">{sel.icon}</span>}
+        <span>{sel?.label ?? '—'}</span>
+      </button>
+      {open && (
+        <div className="wk-pill-menu">
+          {options.map((o) => (
+            <button key={o.value || '_'} type="button" className={`wk-pill-opt ${o.value === value ? 'on' : ''}`}
+              onClick={() => { onChange(o.value); setOpen(false); }}>
+              {o.icon && <span className="wk-pill-ic">{o.icon}</span>}
+              <span className="wk-pill-lbl">{o.label}</span>
+              {o.value === value && (
+                <svg className="ck" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function TaskPanel() {
   const taskPanel = useUI((s) => s.taskPanel);
@@ -56,14 +143,12 @@ export function TaskPanel() {
   // task on (the day-view's selected day), so editing matches what the card shows.
   const dayTracked = task ? actualSecondsForTaskOnDay(entries, task.id, dayDate) : 0;
   const running = !!task && entries.some((e) => e.isRunning && e.scheduledTaskId === task.id);
-  // Label for the editable field: "today" when the viewed day is today, else the date.
+  // Label for the editable hours row: "today" when the viewed day is today, else the date.
   const viewingToday = dayDate === todayKey();
-  const dayLabel = viewingToday
-    ? 'Hours worked today'
-    : `Hours worked · ${(() => { const d = parseDateKey(dayDate); return `${dayShort(d)} ${d.getDate()} ${monthShort(d)}`; })()}`;
+  const workedLabel = viewingToday ? 'Worked today' : `Worked · ${fmtDay(dayDate)}`;
 
   const [form, setForm] = useState<Form>(blankForm);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   // The hours string as loaded on open — lets us write only on a real edit.
   const loadedHours = useRef('0:00');
 
@@ -77,7 +162,7 @@ export function TaskPanel() {
         title: task.title, clientId: task.clientId || '', projectId: task.projectId || '',
         date: task.date, deadline: task.deadline || '', kind: task.kind,
         estimate: task.estimateHours != null ? String(task.estimateHours) : '',
-        hours, description: task.description || '',
+        hours, description: task.description || '', notes: task.notes || '',
         status: task.status, priority: task.priority,
       });
     } else {
@@ -87,6 +172,16 @@ export function TaskPanel() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskPanel]);
+
+  // Keep the hours field in sync with the day you're viewing: if you navigate to
+  // another day while the panel is open, re-load that day's hours for the task.
+  useEffect(() => {
+    if (!task) return;
+    const hours = formatHMS(actualSecondsForTaskOnDay(entries, task.id, dayDate));
+    loadedHours.current = hours;
+    setForm((f) => ({ ...f, hours }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayDate]);
 
   const clientProjects = useMemo(
     () => projects.filter((p) => !form.clientId || p.clientId === form.clientId),
@@ -106,6 +201,7 @@ export function TaskPanel() {
       priority: form.priority,
       estimateHours: form.estimate.trim() && !isNaN(Number(form.estimate)) ? Number(form.estimate) : undefined,
       description: form.description.trim() || undefined,
+      notes: form.notes.trim() || undefined,
     };
     const newSecs = parseHMS(form.hours);
     if (isNew) {
@@ -138,82 +234,72 @@ export function TaskPanel() {
       <div className={`wk-ov ${open ? 'on' : ''}`} onClick={closePanel} />
       <aside className={`wk-panel ${open ? 'on' : ''}`} aria-hidden={!open}>
         <div className="wk-ptop">
-          <span className="wk-pseclbl">Status</span>
           <button className="wk-px" onClick={closePanel} aria-label="Close">×</button>
         </div>
-        <div className="wk-seg">
-          {STATUS_ORDER.map((v) => {
-            const m = STATUS_META[v];
-            const on = form.status === v;
-            return (
-              <button key={v} className={`wk-segb ${on ? 'on' : ''}`} style={on ? { color: m.c, borderColor: m.c, background: `${m.c}14` } : undefined} onClick={() => set({ status: v })}>
-                <i style={{ background: m.c }} />{m.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="wk-pseclbl wk-pseclbl-2">Urgency</div>
-        <div className="wk-seg">
-          {PRIO3.map((p) => {
-            const on = isPrio(p.v, form.priority);
-            return (
-              <button key={p.v} className={`wk-segb ${on ? 'on' : ''}`} style={on ? { color: p.c, borderColor: p.c, background: `${p.c}14` } : undefined} onClick={() => set({ priority: p.v })}>
-                <i style={{ background: p.c }} />{p.label}
-              </button>
-            );
-          })}
+
+        <AutoTextarea inputRef={titleRef} className="wk-ptitle" value={form.title} placeholder="Task title"
+          singleLine onChange={(v) => set({ title: v })} />
+
+        <AutoTextarea className="wk-pdesc" value={form.description} placeholder="Add description…"
+          onChange={(v) => set({ description: v })} />
+
+        <div className="wk-pills">
+          <PillSelect value={form.status}
+            options={STATUS_ORDER.map((v) => ({ value: v, label: STATUS_META[v].label, icon: <span style={{ color: STATUS_META[v].c, display: 'inline-flex' }}><IconStatus status={v} /></span> }))}
+            onChange={(v) => set({ status: v as TaskStatus })} />
+          <PillSelect value={form.priority === 'asap' ? 'high' : form.priority}
+            options={PRIO3.map((p) => ({ value: p.v, label: p.label, icon: <span style={{ color: p.c, display: 'inline-flex' }}><IconPriority level={p.v} /></span> }))}
+            onChange={(v) => set({ priority: v as TaskPriority })} />
+          <PillSelect value={form.clientId}
+            options={[{ value: '', label: 'No client', icon: <span className="wk-pill-sw nofill" /> }, ...clients.map((c) => ({ value: c.id, label: c.name, icon: <span className="wk-pill-sw" style={{ background: c.color }} /> }))]}
+            onChange={(v) => set({ clientId: v, projectId: '' })} />
+          <PillSelect value={form.projectId}
+            options={[{ value: '', label: 'No project', icon: <span className="wk-pill-sw nofill" /> }, ...clientProjects.map((p) => ({ value: p.id, label: p.name, icon: <span className="wk-pill-sw" style={{ background: p.color }} /> }))]}
+            onChange={(v) => set({ projectId: v })} />
+          <PillSelect value={form.kind}
+            options={KINDS.map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1), icon: <span className="wk-pill-ic-muted"><IconKind kind={k} /></span> }))}
+            onChange={(v) => set({ kind: v as TaskKind })} />
         </div>
 
-        <input ref={titleRef} className="wk-ptitle" value={form.title} placeholder="Task title"
-          onChange={(e) => set({ title: e.target.value })} />
-
-        <div className="wk-grid2">
-          <label className="wk-fld"><span>Client</span>
-            <select value={form.clientId} onChange={(e) => set({ clientId: e.target.value, projectId: '' })}>
-              <option value="">—</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <label className="wk-fld"><span>Project</span>
-            <select value={form.projectId} onChange={(e) => set({ projectId: e.target.value })}>
-              <option value="">—</option>
-              {clientProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-          <label className="wk-fld"><span>Scheduled</span>
-            <input type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} />
-          </label>
-          <label className="wk-fld"><span>Deadline</span>
-            <input type="date" value={form.deadline} onChange={(e) => set({ deadline: e.target.value })} />
-          </label>
-          <label className="wk-fld"><span>Type</span>
-            <select value={form.kind} onChange={(e) => set({ kind: e.target.value as TaskKind })}>
-              {KINDS.map((k) => <option key={k} value={k}>{k[0].toUpperCase() + k.slice(1)}</option>)}
-            </select>
-          </label>
-          <label className="wk-fld"><span>Estimate (h)</span>
-            <input className="mono" value={form.estimate} placeholder="—" inputMode="decimal"
-              onChange={(e) => set({ estimate: e.target.value })} />
-          </label>
-          <div className="wk-fld full"><span>{dayLabel}</span>
-            <div className="wk-hline">
-              <input className="mono" value={form.hours} onChange={(e) => set({ hours: e.target.value })} />
+        <div className="wk-rows">
+          <div className="wk-row">
+            <span className="wk-row-k">Scheduled</span>
+            <DatePill value={form.date} onChange={(v) => set({ date: v })} placeholder="Pick a date" />
+          </div>
+          <div className="wk-row">
+            <span className="wk-row-k">Deadline</span>
+            <DatePill value={form.deadline} onChange={(v) => set({ deadline: v })} placeholder="Add deadline" />
+          </div>
+          <div className="wk-row">
+            <span className="wk-row-k">Estimate</span>
+            <span className="wk-row-v">
+              <input className="wk-row-in mono" value={form.estimate} placeholder="—" inputMode="decimal"
+                onChange={(e) => set({ estimate: e.target.value })} /><em>h</em>
+            </span>
+          </div>
+          <div className={`wk-row ${running ? 'run' : ''}`}>
+            <span className="wk-row-k">{workedLabel}</span>
+            <span className="wk-row-v">
+              <input className={`wk-row-in mono ${running ? 'run' : ''}`} value={form.hours} onChange={(e) => set({ hours: e.target.value })} />
               {task && (
                 <button className={`wk-ipp ${running ? 'run' : ''}`} onClick={onInlineTimer}>
                   {running ? <IconPauseS /> : <IconPlayS />}{running ? 'running' : 'paused'}
                 </button>
               )}
-            </div>
+            </span>
           </div>
           {task && (
-            <div className="wk-fld full wk-rocum"><span>Total · all days</span>
-              <div className="wk-rocum-val mono">{formatHMS(tracked)}</div>
+            <div className="wk-row">
+              <span className="wk-row-k">All days</span>
+              <span className="wk-row-v mono muted">{formatHMS(tracked)}</span>
             </div>
           )}
-          <label className="wk-fld full"><span>Description</span>
-            <textarea value={form.description} placeholder="Details…" onChange={(e) => set({ description: e.target.value })} />
-          </label>
         </div>
+
+        <label className="wk-fld full wk-notes-fld"><span>Notes &amp; links</span>
+          <AutoTextarea className="wk-pnotes" value={form.notes} placeholder="Anything that shouldn’t show on the card — links, context, reminders…"
+            onChange={(v) => set({ notes: v })} />
+        </label>
 
         <div className="wk-pfoot">
           {task && <button className="wk-del" title="Delete" onClick={onDelete}><IconTrash /></button>}
