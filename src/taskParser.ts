@@ -269,6 +269,67 @@ export function parseTasks(text: string, projects: Project[], today = new Date()
   return out;
 }
 
+// ---- command intent (the chat is command-driven) ---------------------------
+
+/**
+ * Work out whether the user asked for ONE task or SEVERAL, and strip the
+ * command lead-in ("Create a task:", "make these tasks and spread …:").
+ * Returns mode 'ask' when it genuinely can't tell — the chat then asks.
+ */
+export function detectIntent(raw: string): { mode: 'one' | 'several' | 'ask'; body: string } {
+  const trimmed = raw.trim();
+  let command = '';
+  let body = trimmed;
+
+  const colon = trimmed.match(/^([^\n:]{1,80}):\s*([\s\S]+)$/);
+  if (colon && /(create|make|add|task)/i.test(colon[1])) {
+    command = colon[1];
+    body = colon[2].trim();
+  } else {
+    const first = trimmed.split('\n')[0];
+    if (/^(create|make|add|new)\b/i.test(first) && first.length < 80) {
+      command = first;
+      body = trimmed.slice(first.length).trim() || trimmed;
+    }
+  }
+
+  const scope = (command || trimmed).toLowerCase();
+  const plural = /\btasks\b|\bspread\b|across the (week|day)|\beach\b|\bthese\b/.test(scope);
+  const singular = /\ba task\b|\bone task\b|\bthis\b|make this/.test(scope);
+  const mode = plural && !singular ? 'several' : singular && !plural ? 'one' : 'ask';
+  return { mode, body: body || trimmed };
+}
+
+/** Turn a whole pasted block into ONE task — title = first line, rest = note. */
+export function parseSingleTask(text: string, projects: Project[], today = new Date()): ParsedTask {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const titleRaw = stripMarkers(lines[0] || text.trim());
+  const descRaw = lines.slice(1).map((l) => stripMarkers(l)).filter(Boolean).join('\n');
+
+  let dateKey: string | undefined;
+  let deadline: string | undefined;
+  let label: string | undefined;
+  for (const l of lines) {
+    const h = parseHeader(l);
+    if (h) { const d = toDateKey(nextWeekday(h.dow, today)); dateKey = d; deadline = h.by ? d : undefined; label = h.label; break; }
+  }
+
+  const guess = guessProject(text, projects);
+  const title = translateTitle(titleRaw);
+  return {
+    id: tmpId(),
+    title,
+    original: title !== titleRaw ? titleRaw : undefined,
+    description: descRaw ? translateText(descRaw) : undefined,
+    projectId: guess?.projectId,
+    priority: detectPriority(text, deadline, today),
+    reason: guess?.reason,
+    dateKey,
+    deadline,
+    sectionLabel: label,
+  };
+}
+
 // ---- auto-scheduling (spread day-less tasks across the work week) ----------
 
 const PRIO_RANK: Record<TaskPriority, number> = { asap: 0, high: 1, normal: 2, low: 3 };

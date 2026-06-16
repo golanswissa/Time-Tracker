@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUI } from '../ui';
 import { useStore } from '../store';
-import { parseTasks, autoSchedule, type ParsedTask } from '../taskParser';
+import { parseTasks, parseSingleTask, autoSchedule, detectIntent, type ParsedTask } from '../taskParser';
 import type { TaskPriority } from '../types';
 import { parseDateKey, monthShort, todayKey } from '../utils';
 
 type Row = ParsedTask & { state: 'pending' | 'approved'; reallocating?: boolean };
-type Msg = { id: string; role: 'user' | 'assistant'; text?: string; rows?: Row[] };
+type Msg = { id: string; role: 'user' | 'assistant'; text?: string; rows?: Row[]; clarify?: { body: string } };
 
 // three urgency levels only: Low / Medium / High (store 'normal' = Medium)
 const PRIO_LABEL: Record<TaskPriority, string> = { asap: 'High', high: 'High', normal: 'Medium', low: 'Low' };
@@ -57,20 +57,37 @@ export function ChatRail() {
     return `${monthShort(d)} ${d.getDate()}`;
   };
 
+  // Build the assistant's response for a decided intent ('one' | 'several').
+  const buildAssistant = (mode: 'one' | 'several', body: string): Msg => {
+    if (mode === 'one') {
+      const [r] = autoSchedule([parseSingleTask(body, projects)], { workdays: [1, 2, 3, 4, 5] });
+      return { id: uid(), role: 'assistant', text: 'Here you go — one task:', rows: [{ ...r, state: 'pending' }] };
+    }
+    const parsed = autoSchedule(parseTasks(body, projects), { workdays: [1, 2, 3, 4, 5] });
+    if (!parsed.length) return { id: uid(), role: 'assistant', text: "I couldn’t pull a task out of that — try again." };
+    return { id: uid(), role: 'assistant', text: `Here you go — ${parsed.length} tasks, spread across the week:`, rows: parsed.map((p) => ({ ...p, state: 'pending' as const })) };
+  };
+
   const send = () => {
     if (!text.trim()) return;
-    const parsed = autoSchedule(parseTasks(text, projects), { workdays: [1, 2, 3, 4, 5] });
-    const user: Msg = { id: uid(), role: 'user', text: text.trim() };
-    const assistant: Msg = parsed.length
-      ? {
-          id: uid(), role: 'assistant',
-          text: `Hi — I found ${parsed.length} task${parsed.length > 1 ? 's' : ''} in that:`,
-          rows: parsed.map((p) => ({ ...p, state: 'pending' as const })),
-        }
-      : { id: uid(), role: 'assistant', text: "I couldn’t pull any tasks out of that — try a list, or day-grouped notes." };
+    const raw = text.trim();
+    const { mode, body } = detectIntent(raw);
+    const user: Msg = { id: uid(), role: 'user', text: raw };
+    const assistant: Msg = mode === 'ask'
+      ? { id: uid(), role: 'assistant', text: 'Got it — should I make this one task, or several?', clarify: { body } }
+      : buildAssistant(mode, body);
     setThread((t) => [...t, user, assistant]);
     setText('');
   };
+
+  // resolve an "one or several?" prompt → replace it with the actual cards
+  const resolveClarify = (msgId: string, mode: 'one' | 'several') =>
+    setThread((t) => t.map((m) => {
+      if (m.id !== msgId || !m.clarify) return m;
+      const built = buildAssistant(mode, m.clarify.body);
+      return { ...m, text: built.text, rows: built.rows, clarify: undefined };
+    }));
+
   const clear = () => { setThread([]); setText(''); };
 
   const fileRow = (r: Row) => {
@@ -165,10 +182,11 @@ export function ChatRail() {
             <div className="wk-tf-empty">
               <div className="wk-tf-hero">
                 <div className="wk-tf-hero-mark"><ArrowUp /></div>
-                <div className="wk-tf-hero-t">Turn a message into tasks</div>
+                <div className="wk-tf-hero-t">Tell me what to add</div>
                 <div className="wk-tf-hero-p">
-                  Paste a list, a WhatsApp dump, or day-grouped notes — or just tell me what to add. I’ll split
-                  it into tasks, translate to English, file each under a project, and schedule your week.
+                  Type a command and paste — <b>“Create a task: …”</b> for one, or
+                  <b> “Create these tasks and spread across the week: …”</b> for several. I’ll translate it,
+                  file it under a project, and schedule it. If it’s unclear, I’ll ask. You confirm before anything lands.
                 </div>
               </div>
             </div>
@@ -179,6 +197,12 @@ export function ChatRail() {
           ) : (
             <div key={m.id} className="wk-tf-amsg">
               {m.text && <div className="wk-tf-aintro">{m.text}</div>}
+              {m.clarify && (
+                <div className="wk-tf-clarify">
+                  <button className="wk-tf-cbtn" onClick={() => resolveClarify(m.id, 'one')}>One task</button>
+                  <button className="wk-tf-cbtn" onClick={() => resolveClarify(m.id, 'several')}>Several</button>
+                </div>
+              )}
               {m.rows?.map((r) => renderCard(m.id, r))}
               {m.rows && m.rows.some((r) => r.state === 'pending') && (
                 <button className="wk-tf-all" onClick={() => approveAll(m.id)}>
@@ -192,7 +216,7 @@ export function ChatRail() {
         <div className="wk-tf-composer">
           <textarea
             className="wk-tf-ta"
-            placeholder="Paste tasks, or ask me to add one…"
+            placeholder="e.g. “Create a task: …” or “Create these tasks and spread across the week: …”"
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }}
