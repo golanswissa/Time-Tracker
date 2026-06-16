@@ -101,8 +101,11 @@ interface Actions {
   setTaskStatus: (id: string, status: TaskStatus) => void;
   /** Start (or restart) a timer tracked against a scheduled task. */
   startTaskTimer: (taskId: string) => Entry | undefined;
-  /** Manually set a task's total tracked time (collapses its entries into one). */
-  setTaskHours: (taskId: string, seconds: number) => void;
+  /**
+   * Manually set a task's tracked time for a single day (defaults to today).
+   * Only that day's entries are rewritten; other days are untouched.
+   */
+  setTaskHours: (taskId: string, seconds: number, dateKey?: string) => void;
 
   // Settings
   updateSettings: (data: Partial<Settings>) => void;
@@ -614,18 +617,18 @@ export const useStore = create<Store>()(
         }));
         return entry;
       },
-      setTaskHours: (taskId, seconds) =>
+      setTaskHours: (taskId, seconds, dateKey) =>
         set((s) => {
           const task = s.scheduledTasks.find((t) => t.id === taskId);
           if (!task) return {} as Partial<State>;
           const projectId = task.projectId || s.projects[0]?.id;
           const category = s.settings.defaultTaskId || s.tasks[0]?.id;
-          // The hours field edits TODAY's tracked time only. Entries on other
-          // days (e.g. a task that rolled forward from yesterday) are left
-          // untouched, so editing today's total can never move yesterday's hours.
-          const today = todayKey();
+          // The hours field edits ONE day's tracked time (the day you're viewing
+          // the task on). Entries on other days are left untouched, so editing a
+          // task's hours on one day can never move time recorded on another day.
+          const day = dateKey || todayKey();
           const rest = s.entries.filter(
-            (e) => e.scheduledTaskId !== taskId || e.date !== today
+            (e) => e.scheduledTaskId !== taskId || e.date !== day
           );
           const secs = Math.max(0, Math.floor(seconds));
           if (secs > 0 && projectId && category) {
@@ -634,7 +637,7 @@ export const useStore = create<Store>()(
               projectId,
               taskId: category,
               notes: task.title,
-              date: today,
+              date: day,
               durationSeconds: secs,
               isRunning: false,
               scheduledTaskId: taskId,

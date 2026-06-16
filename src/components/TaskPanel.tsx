@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { actualSecondsForTask, actualSecondsForTaskOnDay, STATUS_META, STATUS_ORDER } from '../planner';
-import { formatHMS, todayKey } from '../utils';
+import { dayShort, formatHMS, monthShort, parseDateKey, todayKey } from '../utils';
 import type { TaskKind, TaskPriority, TaskStatus } from '../types';
 import { IconPlayS, IconPauseS, IconTrash } from './icons';
 
@@ -34,6 +34,7 @@ const blankForm = (): Form => ({
 export function TaskPanel() {
   const taskPanel = useUI((s) => s.taskPanel);
   const createPreset = useUI((s) => s.createPreset);
+  const dayDate = useUI((s) => s.dayDate);
   const closePanel = useUI((s) => s.closePanel);
   const clients = useStore((s) => s.clients);
   const projects = useStore((s) => s.projects);
@@ -51,9 +52,15 @@ export function TaskPanel() {
   const task = !isNew && taskPanel ? tasks.find((t) => t.id === taskPanel) : undefined;
   // All-time tracked (used for the delete-confirm message).
   const tracked = task ? actualSecondsForTask(entries, task.id) : 0;
-  // The hours field shows/edits TODAY's tracked time only.
-  const todaysTracked = task ? actualSecondsForTaskOnDay(entries, task.id, todayKey()) : 0;
+  // The hours field shows/edits the tracked time for the day you're viewing the
+  // task on (the day-view's selected day), so editing matches what the card shows.
+  const dayTracked = task ? actualSecondsForTaskOnDay(entries, task.id, dayDate) : 0;
   const running = !!task && entries.some((e) => e.isRunning && e.scheduledTaskId === task.id);
+  // Label for the editable field: "today" when the viewed day is today, else the date.
+  const viewingToday = dayDate === todayKey();
+  const dayLabel = viewingToday
+    ? 'Hours worked today'
+    : `Hours worked · ${(() => { const d = parseDateKey(dayDate); return `${dayShort(d)} ${d.getDate()} ${monthShort(d)}`; })()}`;
 
   const [form, setForm] = useState<Form>(blankForm);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -64,7 +71,7 @@ export function TaskPanel() {
   useEffect(() => {
     if (!taskPanel) return;
     if (task) {
-      const hours = formatHMS(todaysTracked);
+      const hours = formatHMS(dayTracked);
       loadedHours.current = hours;
       setForm({
         title: task.title, clientId: task.clientId || '', projectId: task.projectId || '',
@@ -103,12 +110,14 @@ export function TaskPanel() {
     const newSecs = parseHMS(form.hours);
     if (isNew) {
       const created = addScheduledTask({ ...fields, status: form.status, source: 'manual' });
-      if (newSecs > 0) setTaskHours(created.id, newSecs);
+      // New task: hours land on the day it's scheduled for.
+      if (newSecs > 0) setTaskHours(created.id, newSecs, fields.date);
     } else if (task) {
       updateScheduledTask(task.id, { ...fields, status: form.status });
-      // Only rewrite today's hours when the field was actually edited — a plain
-      // Save must never touch tracked time (and never re-date it to another day).
-      if (form.hours.trim() !== loadedHours.current.trim()) setTaskHours(task.id, newSecs);
+      // Only rewrite hours when the field was actually edited — a plain Save must
+      // never touch tracked time. Edits land on the day you're viewing (dayDate),
+      // never on another day's recorded time.
+      if (form.hours.trim() !== loadedHours.current.trim()) setTaskHours(task.id, newSecs, dayDate);
     }
     closePanel();
   };
@@ -186,7 +195,7 @@ export function TaskPanel() {
             <input className="mono" value={form.estimate} placeholder="—" inputMode="decimal"
               onChange={(e) => set({ estimate: e.target.value })} />
           </label>
-          <div className="wk-fld full"><span>Total hours worked</span>
+          <div className="wk-fld full"><span>{dayLabel}</span>
             <div className="wk-hline">
               <input className="mono" value={form.hours} onChange={(e) => set({ hours: e.target.value })} />
               {task && (
@@ -196,6 +205,11 @@ export function TaskPanel() {
               )}
             </div>
           </div>
+          {task && (
+            <div className="wk-fld full wk-rocum"><span>Total · all days</span>
+              <div className="wk-rocum-val mono">{formatHMS(tracked)}</div>
+            </div>
+          )}
           <label className="wk-fld full"><span>Description</span>
             <textarea value={form.description} placeholder="Details…" onChange={(e) => set({ description: e.target.value })} />
           </label>
