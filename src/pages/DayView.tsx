@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
-import { actualSecondsForTask, sortTasks } from '../planner';
+import { actualSecondsForTask, actualSecondsForTaskOnDay, sortTasks } from '../planner';
 import { addDays, entrySeconds, formatHMS, parseDateKey, toDateKey, todayKey } from '../utils';
 import type { ScheduledTask } from '../types';
 import { IconPause, IconPencil, IconPlay } from '../components/icons';
@@ -131,9 +131,12 @@ export function DayView() {
         {dayTasks.map((t) => {
           const project = getProject(t.projectId);
           const client = getClient(t);
+          // Big number = the hours worked on THIS day (matches the panel + week
+          // strip). The estimate bar references the whole-task budget (all days).
+          const dayTracked = actualSecondsForTaskOnDay(entries, t.id, selectedKey, now);
           const tracked = actualSecondsForTask(entries, t.id, now);
           const running = runningTaskId === t.id;
-          const worked = tracked > 0;
+          const worked = dayTracked > 0;
           const estS = (t.estimateHours || 0) * 3600;
           const overH = Math.round((tracked - estS) / 3600);
           const over = estS > 0 && overH >= 1;
@@ -153,7 +156,7 @@ export function DayView() {
                   </div>
                 </div>
                 {t.description && <div className="desc">{t.description}</div>}
-                <div className="time mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(tracked, running)}</div>
+                <div className="time mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(dayTracked, running)}</div>
                 {estS > 0 && (
                   <div className="wk-pbar">
                     <div className="track"><div className="tick" style={{ left: `${pct}%` }} /></div>
@@ -173,7 +176,7 @@ export function DayView() {
                 <div className="nm">{t.title}</div>
                 <div className="pj">{project?.name || client?.name || 'No project'}</div>
               </div>
-              <div className="t mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(tracked, running)}</div>
+              <div className="t mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(dayTracked, running)}</div>
               <div className="wk-cbar"><i style={{ width: `${estS > 0 ? pct : (worked ? 100 : 0)}%` }} /></div>
             </div>
           );
