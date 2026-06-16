@@ -49,6 +49,17 @@ export const actualSecondsForTask = (
     .filter((e) => e.scheduledTaskId === taskId)
     .reduce((acc, e) => acc + entrySeconds(e, now), 0);
 
+/** Tracked seconds for a task on a single day (entries dated `dateKey`). */
+export const actualSecondsForTaskOnDay = (
+  entries: Entry[],
+  taskId: string,
+  dateKey: string,
+  now = Date.now()
+): number =>
+  entries
+    .filter((e) => e.scheduledTaskId === taskId && e.date === dateKey)
+    .reduce((acc, e) => acc + entrySeconds(e, now), 0);
+
 export interface DayCapacity {
   /** Sum of estimates of that day's tasks. */
   plannedHours: number;

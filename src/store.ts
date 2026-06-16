@@ -620,9 +620,13 @@ export const useStore = create<Store>()(
           if (!task) return {} as Partial<State>;
           const projectId = task.projectId || s.projects[0]?.id;
           const category = s.settings.defaultTaskId || s.tasks[0]?.id;
-          const date = task.date || todayKey();
-          // Drop this task's existing entries, then add one manual entry for the total.
-          const rest = s.entries.filter((e) => e.scheduledTaskId !== taskId);
+          // The hours field edits TODAY's tracked time only. Entries on other
+          // days (e.g. a task that rolled forward from yesterday) are left
+          // untouched, so editing today's total can never move yesterday's hours.
+          const today = todayKey();
+          const rest = s.entries.filter(
+            (e) => e.scheduledTaskId !== taskId || e.date !== today
+          );
           const secs = Math.max(0, Math.floor(seconds));
           if (secs > 0 && projectId && category) {
             rest.push({
@@ -630,7 +634,7 @@ export const useStore = create<Store>()(
               projectId,
               taskId: category,
               notes: task.title,
-              date,
+              date: today,
               durationSeconds: secs,
               isRunning: false,
               scheduledTaskId: taskId,

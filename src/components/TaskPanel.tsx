@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
-import { actualSecondsForTask, STATUS_META, STATUS_ORDER } from '../planner';
+import { actualSecondsForTask, actualSecondsForTaskOnDay, STATUS_META, STATUS_ORDER } from '../planner';
 import { formatHMS, todayKey } from '../utils';
 import type { TaskKind, TaskPriority, TaskStatus } from '../types';
 import { IconPlayS, IconPauseS, IconTrash } from './icons';
@@ -49,24 +49,32 @@ export function TaskPanel() {
   const open = taskPanel !== null;
   const isNew = taskPanel === 'new';
   const task = !isNew && taskPanel ? tasks.find((t) => t.id === taskPanel) : undefined;
+  // All-time tracked (used for the delete-confirm message).
   const tracked = task ? actualSecondsForTask(entries, task.id) : 0;
+  // The hours field shows/edits TODAY's tracked time only.
+  const todaysTracked = task ? actualSecondsForTaskOnDay(entries, task.id, todayKey()) : 0;
   const running = !!task && entries.some((e) => e.isRunning && e.scheduledTaskId === task.id);
 
   const [form, setForm] = useState<Form>(blankForm);
   const titleRef = useRef<HTMLInputElement>(null);
+  // The hours string as loaded on open — lets us write only on a real edit.
+  const loadedHours = useRef('0:00');
 
   // Populate only on open (keep the content during the slide-out close).
   useEffect(() => {
     if (!taskPanel) return;
     if (task) {
+      const hours = formatHMS(todaysTracked);
+      loadedHours.current = hours;
       setForm({
         title: task.title, clientId: task.clientId || '', projectId: task.projectId || '',
         date: task.date, deadline: task.deadline || '', kind: task.kind,
         estimate: task.estimateHours != null ? String(task.estimateHours) : '',
-        hours: formatHMS(tracked), description: task.description || '',
+        hours, description: task.description || '',
         status: task.status, priority: task.priority,
       });
     } else {
+      loadedHours.current = '0:00';
       setForm({ ...blankForm(), projectId: createPreset?.projectId || '', clientId: createPreset?.clientId || '', date: createPreset?.date || todayKey() });
       setTimeout(() => titleRef.current?.focus(), 80);
     }
@@ -98,7 +106,9 @@ export function TaskPanel() {
       if (newSecs > 0) setTaskHours(created.id, newSecs);
     } else if (task) {
       updateScheduledTask(task.id, { ...fields, status: form.status });
-      if (newSecs !== tracked) setTaskHours(task.id, newSecs);
+      // Only rewrite today's hours when the field was actually edited — a plain
+      // Save must never touch tracked time (and never re-date it to another day).
+      if (form.hours.trim() !== loadedHours.current.trim()) setTaskHours(task.id, newSecs);
     }
     closePanel();
   };
