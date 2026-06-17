@@ -8,9 +8,9 @@ import { entrySeconds } from './utils';
  * in the bottom banner; Done leaves the list.
  */
 export const STATUS_META: Record<TaskStatus, { label: string; c: string }> = {
-  todo: { label: 'Pending', c: '#9aa0a6' },
-  doing: { label: 'Working', c: '#a9870b' },
-  blocked: { label: 'Under review', c: '#b4502a' },
+  todo: { label: 'To do', c: '#9aa0a6' },
+  doing: { label: 'In Progress', c: '#a9870b' },
+  blocked: { label: 'In Review', c: '#b4502a' },
   done: { label: 'Done', c: '#0f7a45' },
 };
 export const STATUS_ORDER: TaskStatus[] = ['todo', 'doing', 'blocked', 'done'];
@@ -101,6 +101,28 @@ export const sortTasks = (a: ScheduledTask, b: ScheduledTask): number => {
   const da = a.deadline || '9999-99';
   const db = b.deadline || '9999-99';
   return da < db ? -1 : da > db ? 1 : 0;
+};
+
+/**
+ * Deadline proximity for a card chip. `tone`: 'over' (past due) · 'soon'
+ * (today/tomorrow) · 'near' (≤3 days) · 'far'. Returns null when no deadline.
+ */
+export const dueInfo = (
+  deadline: string | undefined,
+  todayKey: string
+): { label: string; tone: 'over' | 'soon' | 'near' | 'far'; days: number } | null => {
+  if (!deadline) return null;
+  const ms = 86400000;
+  const a = new Date(todayKey + 'T00:00:00');
+  const b = new Date(deadline + 'T00:00:00');
+  const days = Math.round((b.getTime() - a.getTime()) / ms);
+  let label: string;
+  if (days < 0) label = `${-days}d overdue`;
+  else if (days === 0) label = 'Due today';
+  else if (days === 1) label = 'Due tomorrow';
+  else label = `Due in ${days}d`;
+  const tone = days < 0 ? 'over' : days <= 1 ? 'soon' : days <= 3 ? 'near' : 'far';
+  return { label, tone, days };
 };
 
 /** Pull http(s) URLs out of a blob of pasted text. */

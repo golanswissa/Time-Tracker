@@ -3,6 +3,7 @@ import type { Route } from '../types';
 import { useUI } from '../ui';
 import { ChatRail } from './ChatRail';
 import { TaskPanel } from './TaskPanel';
+import { SunArc } from './SunArc';
 import {
   IconHam, IconPlus, IconLines,
   NavToday, NavClients, NavProjects, NavReports, NavInvoices, NavCategories, NavSettings,
@@ -43,6 +44,8 @@ export function AppShell({ route, onNavigate, children }: Props) {
 
   return (
     <div className="wk-app">
+      {/* ambient sky-dome background (day view only) */}
+      {route === 'today' && <SunArc />}
       {/* left nav — cuts into the layout */}
       <aside className={`wk-sidenav ${navOpen ? 'on' : ''}`}>
         <div className="wk-sn-in">

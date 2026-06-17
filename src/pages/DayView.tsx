@@ -1,10 +1,43 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
-import { actualSecondsForTask, actualSecondsForTaskOnDay, sortTasks } from '../planner';
+import { actualSecondsForTask, actualSecondsForTaskOnDay, dueInfo, PRIORITY_META, sortTasks, STATUS_META, STATUS_ORDER } from '../planner';
 import { addDays, entrySeconds, formatHMS, parseDateKey, toDateKey, todayKey } from '../utils';
-import type { ScheduledTask } from '../types';
-import { IconPause, IconPencil, IconPlay } from '../components/icons';
+import type { ScheduledTask, TaskStatus } from '../types';
+import { IconPause, IconPencil, IconPlay, IconStatus, IconPriority } from '../components/icons';
+
+/** Status picker: a trigger you render, plus a dropdown of the four statuses. */
+function StatusPicker({ value, onPick, children }: {
+  value: TaskStatus; onPick: (s: TaskStatus) => void; children: (open: boolean) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+  return (
+    <div className="wk-stp" ref={ref}>
+      <button className="wk-stp-trig" onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{children(open)}</button>
+      {open && (
+        <div className="wk-stp-menu" onClick={(e) => e.stopPropagation()}>
+          {STATUS_ORDER.map((s) => (
+            <button key={s} className={`wk-stp-opt ${s === value ? 'on' : ''}`} onClick={(e) => { e.stopPropagation(); onPick(s); setOpen(false); }}>
+              <span className="wk-stp-ic" style={{ color: STATUS_META[s].c }}><IconStatus status={s} /></span>
+              <span className="wk-stp-lb">{STATUS_META[s].label}</span>
+              {s === value && (
+                <svg className="wk-stp-ck" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -23,7 +56,7 @@ export function DayView() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<TaskStatus>('doing');
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -35,16 +68,18 @@ export function DayView() {
   // keep the shell's "+" button creating tasks on the day you're looking at
   useEffect(() => { setDayDate(selectedKey); }, [selectedKey, setDayDate]);
 
-  // Tasks "in play" for the day: scheduled on it, PLUS — only on today —
-  // unfinished (Pending/Working/Under-review) tasks from earlier days, rolled
-  // forward so nothing falls off. Done tasks don't roll.
-  const relevant = useMemo(
-    () => scheduledTasks.filter((t) =>
-      t.date === selectedKey || (isToday && t.date < selectedKey && t.status !== 'done')),
-    [scheduledTasks, selectedKey, isToday]
+  // Tasks always exist; the view is filtered by STATUS, not by the day.
+  // The selected day is the time-context (per-day hours + week strip). In Progress
+  // tasks simply persist until you change their status. List is priority-ordered.
+  const dayTasks = useMemo(
+    () => scheduledTasks.filter((t) => t.status === statusFilter).slice().sort(sortTasks),
+    [scheduledTasks, statusFilter]
   );
-  const dayTasks = useMemo(() => relevant.filter((t) => t.status !== 'blocked').slice().sort(sortTasks), [relevant]);
-  const reviewTasks = useMemo(() => relevant.filter((t) => t.status === 'blocked'), [relevant]);
+  const counts = useMemo(() => {
+    const c: Record<TaskStatus, number> = { todo: 0, doing: 0, blocked: 0, done: 0 };
+    scheduledTasks.forEach((t) => { c[t.status] += 1; });
+    return c;
+  }, [scheduledTasks]);
 
   // ----- week strip (Sunday-first) + month total -----
   const weekDays = useMemo(() => {
@@ -56,6 +91,8 @@ export function DayView() {
       return { date, key, n: date.getDate(), secs };
     });
   }, [selectedDate, entries, now]);
+
+  const weekTotal = useMemo(() => weekDays.reduce((a, d) => a + d.secs, 0), [weekDays]);
 
   const monthTotal = useMemo(() => {
     const m = selectedDate.getMonth(), y = selectedDate.getFullYear();
@@ -94,13 +131,10 @@ export function DayView() {
     else { startTaskTimer(t.id); setTaskStatus(t.id, 'doing'); }
     setActiveId(t.id);
   };
-  // Pull a task back out of review → Working, surfaced at the top of the list.
-  const reactivate = (t: ScheduledTask) => { setTaskStatus(t.id, 'doing'); setActiveId(t.id); setReviewOpen(false); };
 
   return (
     <div className="wk-col">
       <div className="wk-week">
-        {!isToday && <button className="wk-wk-today" onClick={() => setSelectedDate(new Date())}>Today</button>}
         <button className="wk-wk-month" onClick={goReport} title="View this month’s report">
           <span>{MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}</span>
           <span className="vr"> · View report</span>
@@ -122,10 +156,26 @@ export function DayView() {
         </div>
       </div>
 
+      <div className="wk-filter">
+        <StatusPicker value={statusFilter} onPick={setStatusFilter}>
+          {(open) => (
+            <span className={`wk-fpill ${open ? 'open' : ''}`}>
+              <span className="wk-fpill-ic" style={{ color: STATUS_META[statusFilter].c }}><IconStatus status={statusFilter} /></span>
+              <span className="wk-fpill-lb">{STATUS_META[statusFilter].label}</span>
+              <span className="wk-fpill-n">{counts[statusFilter]}</span>
+            </span>
+          )}
+        </StatusPicker>
+        <div className="wk-filter-right">
+          <span className="wk-wktot">Week Total: {formatHMS(weekTotal)}</span>
+          {!isToday && <button className="wk-wk-today" onClick={() => setSelectedDate(new Date())}>Today</button>}
+        </div>
+      </div>
+
       <div className="wk-list">
         {dayTasks.length === 0 && (
           <div className="wk-empty">
-            Nothing here yet — hit <b>+</b> to add a task{' '}
+            No {STATUS_META[statusFilter].label.toLowerCase()} tasks — hit <b>+</b> to add one{' '}
             <button className="wk-today" style={{ marginLeft: 6 }} onClick={() => openCreate({ date: selectedKey })}>New task</button>
           </div>
         )}
@@ -142,14 +192,27 @@ export function DayView() {
           const overH = Math.round((tracked - estS) / 3600);
           const over = estS > 0 && overH >= 1;
           const pct = estS > 0 ? Math.min(100, (tracked / estS) * 100) : 0;
+          const due = dueInfo(t.deadline, todayKey());
+          const prioColor = PRIORITY_META[t.priority].color;
+          const statusGlyph = (
+            <StatusPicker value={t.status} onPick={(s) => setTaskStatus(t.id, s)}>
+              {() => <span className="wk-cstat" style={{ color: STATUS_META[t.status].c }} title={STATUS_META[t.status].label}><IconStatus status={t.status} size={16} /></span>}
+            </StatusPicker>
+          );
+          // Priority bars live inside the due pill; without a deadline, bars alone.
+          const prioBars = <span className="wk-prio" style={{ color: prioColor }} title={PRIORITY_META[t.priority].label}><IconPriority level={t.priority} /></span>;
+          const metaPill = due
+            ? <span className={`wk-due ${due.tone}`}>{prioBars}{due.label}</span>
+            : prioBars;
 
           if (t.id === expandedId) {
             return (
               <div key={t.id} className={`wk-card exp ${running ? 'run' : worked ? 'done' : ''}`} onClick={() => expand(t)}>
                 <div className="top">
-                  <div>
-                    <div className="pj">{project?.name || client?.name || 'No project'}</div>
+                  <div className="wk-cinfo">
+                    <div className="wk-cmeta">{statusGlyph}{metaPill}</div>
                     <div className="nm">{t.title}</div>
+                    <div className="pj">{project?.name || client?.name || 'No project'}</div>
                   </div>
                   <div className="acts">
                     <button className="wk-ed" title="Edit" onClick={(e) => { e.stopPropagation(); openEdit(t.id); }}><IconPencil /></button>
@@ -172,40 +235,18 @@ export function DayView() {
           }
           return (
             <div key={t.id} className={`wk-card cond ${running ? 'run' : worked ? 'done' : ''}`} onClick={() => expand(t)}>
-              <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onPlay(t); }}>{running ? <IconPause /> : <IconPlay />}</button>
-              <div>
-                <div className="nm">{t.title}</div>
-                <div className="pj">{project?.name || client?.name || 'No project'}</div>
+              {statusGlyph}
+              <div className="wk-cbody">
+                <span className="nm">{t.title}</span>
+                {metaPill}
               </div>
               <div className="t mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(dayTracked, running)}</div>
+              <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onPlay(t); }}>{running ? <IconPause /> : <IconPlay />}</button>
               <div className="wk-cbar"><i style={{ width: `${estS > 0 ? pct : (worked ? 100 : 0)}%` }} /></div>
             </div>
           );
         })}
       </div>
-
-      {reviewTasks.length > 0 && (
-        <div className="wk-rev">
-          <button className="wk-rev-head" onClick={() => setReviewOpen((o) => !o)}>
-            <span className="wk-rev-dot" />
-            <span className="wk-rev-lbl">Under review · {reviewTasks.length}</span>
-            <svg className={`wk-rev-cv ${reviewOpen ? 'open' : ''}`} viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
-          </button>
-          {reviewOpen && (
-            <div className="wk-rev-list">
-              {reviewTasks.map((t) => (
-                <div key={t.id} className="wk-rev-row">
-                  <div className="wk-rev-tx">
-                    <div className="nm">{t.title}</div>
-                    <div className="pj">{getProject(t.projectId)?.name || getClient(t)?.name || 'No project'}</div>
-                  </div>
-                  <button className="wk-rev-go" onClick={() => reactivate(t)}>Reactivate</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
