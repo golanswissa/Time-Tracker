@@ -38,17 +38,30 @@ export function SunArc() {
   }, []);
 
   const h = now.getHours() + now.getMinutes() / 60;
-  const f = Math.max(0, Math.min(1, (h - DAY_START) / (DAY_END - DAY_START)));
-  const sun = pointAt(f);
-  const belowHorizon = h < DAY_START || h > DAY_END;
+  // Night from 5pm to 6am. Day arc spans 6a→8p (sun); night arc spans 8p→6a
+  // (moon rises on the left at 8pm, sets on the right at 6am = sunrise).
+  const dark = h >= 17 || h < 6;
+  const START = dark ? 20 : DAY_START;   // night starts 20:00
+  const END = dark ? 30 : DAY_END;       // night ends 06:00 (= 30 on a 24h+ scale)
+  const hh = dark && h < 6 ? h + 24 : h; // wrap post-midnight hours onto the night scale
+  const f = Math.max(0, Math.min(1, (hh - START) / (END - START)));
+  const orb = pointAt(f);
+  const showOrb = dark || (h >= DAY_START && h <= DAY_END);
+
+  const fmtHour = (hr: number) => {
+    const x = ((Math.round(hr) % 24) + 24) % 24;
+    if (x === 0) return '12a';
+    if (x === 12) return '12p';
+    return x < 12 ? `${x}a` : `${x - 12}p`;
+  };
 
   // hour ticks + labels, and shorter half-hour ticks (radial to the dome)
   const hours: { x1: number; y1: number; x2: number; y2: number }[] = [];
   const halves: { x1: number; y1: number; x2: number; y2: number }[] = [];
   const labels: { x: number; y: number; t: string }[] = [];
-  for (let m = DAY_START * 2; m <= DAY_END * 2; m++) {
+  for (let m = START * 2; m <= END * 2; m++) {
     const hr = m / 2;
-    const f2 = (hr - DAY_START) / (DAY_END - DAY_START);
+    const f2 = (hr - START) / (END - START);
     const p = pointAt(f2);
     const rad = ((90 + HALF) - f2 * SPAN) * Math.PI / 180;
     const nx = Math.cos(rad), ny = -Math.sin(rad); // outward normal
@@ -58,8 +71,7 @@ export function SunArc() {
     if (onHour) {
       hours.push(seg);
       const lp = { x: p.x + nx * 18, y: p.y + ny * 18 };
-      const hr12 = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
-      labels.push({ x: lp.x, y: lp.y, t: `${hr12}${hr < 12 ? 'a' : 'p'}` });
+      labels.push({ x: lp.x, y: lp.y, t: fmtHour(hr) });
     } else {
       halves.push(seg);
     }
@@ -77,7 +89,7 @@ export function SunArc() {
         {hours.map((t, i) => <line key={`o${i}`} {...t} className="wk-sun-tick" vectorEffect="non-scaling-stroke" />)}
       </svg>
       {labels.map((l, i) => <span key={i} className="wk-sun-lab" style={pct(l.x, l.y)}>{l.t}</span>)}
-      {!belowHorizon && <div className="wk-sun-orb" style={pct(sun.x, sun.y)} />}
+      {showOrb && <div className={`wk-sun-orb ${dark ? 'moon' : ''}`} style={pct(orb.x, orb.y)} />}
       <div className="wk-sun-now">
         <div className="wk-sun-time">{clock}</div>
         <div className="wk-sun-tip">{tipFor(now.getHours())}</div>

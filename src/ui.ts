@@ -16,6 +16,7 @@ interface UIState {
   createPreset: { projectId?: string; clientId?: string; date?: string } | null;
   dayDate: string;
   toggleNav: () => void;
+  closeNav: () => void;
   toggleChat: () => void;
   openCreate: (preset?: { projectId?: string; clientId?: string; date?: string }) => void;
   openEdit: (id: string) => void;
@@ -30,6 +31,7 @@ export const useUI = create<UIState>((set) => ({
   createPreset: null,
   dayDate: todayKey(),
   toggleNav: () => set((s) => ({ navOpen: !s.navOpen })),
+  closeNav: () => set({ navOpen: false }),
   toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
   openCreate: (preset) => set({ taskPanel: 'new', createPreset: preset ?? null }),
   openEdit: (id) => set({ taskPanel: id, createPreset: null }),

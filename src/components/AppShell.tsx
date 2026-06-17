@@ -1,32 +1,26 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
 import { useUI } from '../ui';
 import { ChatRail } from './ChatRail';
 import { TaskPanel } from './TaskPanel';
 import { SunArc } from './SunArc';
+import logoUrl from '../../logo.svg';
 import {
-  IconHam, IconPlus, IconLines,
+  IconPlus, IconLines,
   NavToday, NavClients, NavProjects, NavReports, NavInvoices, NavCategories, NavSettings,
 } from './icons';
 
 type NavItem = { id: Route; label: string; Icon: () => JSX.Element };
-const SECTIONS: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Track',
-    items: [
-      { id: 'today', label: 'Today', Icon: NavToday },
-      { id: 'projects', label: 'Projects', Icon: NavProjects },
-      { id: 'clients', label: 'Clients', Icon: NavClients },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { id: 'reports', label: 'Reports', Icon: NavReports },
-      { id: 'invoices', label: 'Invoices', Icon: NavInvoices },
-      { id: 'tasks', label: 'Categories', Icon: NavCategories },
-    ],
-  },
+// Flat menu (with a divider before Settings) for the hamburger dropdown.
+const MENU: NavItem[] = [
+  { id: 'today', label: 'Today', Icon: NavToday },
+  { id: 'projects', label: 'Projects', Icon: NavProjects },
+  { id: 'clients', label: 'Clients', Icon: NavClients },
+  { id: 'reports', label: 'Reports', Icon: NavReports },
+  { id: 'invoices', label: 'Invoices', Icon: NavInvoices },
+  { id: 'tasks', label: 'Categories', Icon: NavCategories },
+  { id: 'settings', label: 'Settings', Icon: NavSettings },
 ];
 
 interface Props {
@@ -38,53 +32,70 @@ interface Props {
 export function AppShell({ route, onNavigate, children }: Props) {
   const navOpen = useUI((s) => s.navOpen);
   const toggleNav = useUI((s) => s.toggleNav);
+  const closeNav = useUI((s) => s.closeNav);
   const toggleChat = useUI((s) => s.toggleChat);
   const openCreate = useUI((s) => s.openCreate);
   const dayDate = useUI((s) => s.dayDate);
+
+  // close the hamburger dropdown on outside click / Escape
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!navOpen) return;
+    const onDown = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) closeNav(); };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') closeNav(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onEsc);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onEsc); };
+  }, [navOpen, closeNav]);
+
+  // Auto night mode: dark from 5pm to 6am. Toggles a class on <html> so the
+  // whole site re-themes; the sun-arc swaps its sun for a moon to match.
+  const [, setNight] = useState(() => { const h = new Date().getHours(); return h >= 17 || h < 6; });
+  useEffect(() => {
+    // Enforce the theme on every tick (not just on change) so the class can't
+    // get stuck in the wrong state.
+    const apply = () => {
+      const h = new Date().getHours();
+      const isNight = h >= 17 || h < 6;
+      setNight(isNight);
+      document.documentElement.classList.toggle('dark', isNight);
+    };
+    apply();
+    const id = setInterval(apply, 30000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="wk-app">
       {/* ambient sky-dome background (day view only) */}
       {route === 'today' && <SunArc />}
-      {/* left nav — cuts into the layout */}
-      <aside className={`wk-sidenav ${navOpen ? 'on' : ''}`}>
-        <div className="wk-sn-in">
-          <div className="wk-brand"><span className="wk-brand-mk">T</span><span className="wk-brand-tx">Tracker</span></div>
-          {SECTIONS.map((sec) => (
-            <div key={sec.label} className="wk-navgroup">
-              <div className="wk-navlabel">{sec.label}</div>
-              <div className="wk-nav">
-                {sec.items.map(({ id, label, Icon }) => (
-                  <button
-                    key={id}
-                    className={`wk-nav-item ${route === id ? 'active' : ''}`}
-                    onClick={() => onNavigate(id)}
-                  >
-                    <span className="wk-nav-ic"><Icon /></span>
-                    <span className="wk-nav-lb">{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-          <div className="wk-sn-sp" />
-          <div className="wk-navdiv" />
-          <div className="wk-nav">
-            <button
-              className={`wk-nav-item ${route === 'settings' ? 'active' : ''}`}
-              onClick={() => onNavigate('settings')}
-            >
-              <span className="wk-nav-ic"><NavSettings /></span>
-              <span className="wk-nav-lb">Settings</span>
-            </button>
-          </div>
-        </div>
-      </aside>
 
       {/* center */}
       <div className="wk-main">
         <div className="wk-top">
-          <button className="wk-ham" onClick={toggleNav} aria-label="Menu"><IconHam /></button>
+          <div className="wk-tl">
+            <img className="wk-logo" src={logoUrl} alt="Tracker" width={28} height={28} />
+            <div className="wk-navmenu-wrap" ref={menuRef}>
+              <button className={`wk-ham ${navOpen ? 'on' : ''}`} onClick={toggleNav} aria-label="Menu" aria-expanded={navOpen}>
+                <span className="wk-ham-ico"><span /><span /></span>
+              </button>
+              {navOpen && (
+                <div className="wk-navmenu" role="menu">
+                  {MENU.map(({ id, label, Icon }, i) => (
+                    <button
+                      key={id}
+                      role="menuitem"
+                      className={`wk-navmenu-item ${route === id ? 'active' : ''} ${i === MENU.length - 1 ? 'last' : ''}`}
+                      onClick={() => { onNavigate(id); closeNav(); }}
+                    >
+                      <span className="wk-navmenu-ic"><Icon /></span>
+                      <span className="wk-navmenu-lb">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="wk-tr">
             <button className="wk-rb wk-add" onClick={() => openCreate(route === 'today' ? { date: dayDate } : undefined)} title="New task"><IconPlus /></button>
             <button className="wk-rb wk-exp" onClick={toggleChat} title="Assistant"><IconLines /></button>

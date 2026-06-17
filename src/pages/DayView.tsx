@@ -195,14 +195,14 @@ export function DayView() {
           const over = estS > 0 && overH >= 1;
           const pct = estS > 0 ? Math.min(100, (tracked / estS) * 100) : 0;
           const due = dueInfo(t.deadline, todayKey());
-          const prioColor = PRIORITY_META[t.priority].color;
           const statusGlyph = (
             <StatusPicker value={t.status} onPick={(s) => setTaskStatus(t.id, s)}>
               {() => <span className="wk-cstat" style={{ color: STATUS_META[t.status].c }} title={STATUS_META[t.status].label}><IconStatus status={t.status} size={16} /></span>}
             </StatusPicker>
           );
           // Priority bars + due label are ONE pill. With no deadline, bars alone.
-          const prioBars = <span className="wk-prio" style={{ color: prioColor }} title={PRIORITY_META[t.priority].label}><IconPriority level={t.priority} /></span>;
+          // Bars are monochrome (theme colour) — the filled-bar count shows the level.
+          const prioBars = <span className="wk-prio" title={PRIORITY_META[t.priority].label}><IconPriority level={t.priority} /></span>;
           const metaPill = due
             ? <span className={`wk-due ${due.tone}`}>{prioBars}{due.label}</span>
             : prioBars;

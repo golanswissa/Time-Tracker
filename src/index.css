@@ -1220,6 +1220,31 @@ a { color: inherit; text-decoration: none; }
 
 /* top bar */
 .wk-top{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px; }
+.wk-tl{ display:flex; align-items:center; gap:12px; }
+/* hamburger dropdown menu (replaces the old sidebar) */
+.wk-navmenu-wrap{ position:relative; display:inline-flex; }
+.wk-ham{ border-radius:8px; transition:background .14s ease; }
+.wk-ham.on{ background:var(--surface-alt); }
+/* two-line icon (like the chat side) that morphs into an X when open */
+.wk-ham-ico{ position:relative; width:20px; height:14px; display:inline-block; }
+.wk-ham-ico span{ position:absolute; left:0; width:100%; height:2px; border-radius:2px; background:currentColor; transition:transform .28s cubic-bezier(.4,.04,.2,1), top .28s cubic-bezier(.4,.04,.2,1); }
+.wk-ham-ico span:nth-child(1){ top:4px; }
+.wk-ham-ico span:nth-child(2){ top:10px; }
+.wk-ham.on .wk-ham-ico span:nth-child(1){ top:6px; transform:rotate(45deg); }
+.wk-ham.on .wk-ham-ico span:nth-child(2){ top:6px; transform:rotate(-45deg); }
+@media (prefers-reduced-motion:reduce){ .wk-ham-ico span{ transition:none; } }
+.wk-navmenu{ position:absolute; top:calc(100% + 8px); left:0; z-index:40; min-width:206px; background:var(--surface); border:1px solid var(--gray-100); border-radius:12px; box-shadow:0 14px 34px -12px rgba(0,0,0,.26); padding:6px; transform-origin:top left; animation:wkMenuIn .16s cubic-bezier(.22,1,.36,1); }
+@keyframes wkMenuIn{ from{ opacity:0; transform:translateY(-6px) scale(.97); } to{ opacity:1; transform:none; } }
+.wk-navmenu-item{ display:flex; align-items:center; gap:11px; width:100%; border:none; background:none; padding:9px 11px; border-radius:8px; font-size:14px; color:var(--text); cursor:pointer; text-align:left; transition:background .12s ease; }
+.wk-navmenu-item:hover{ background:var(--surface-alt); }
+.wk-navmenu-item.active{ font-weight:600; }
+.wk-navmenu-ic{ display:inline-flex; width:18px; justify-content:center; color:var(--text-muted); } .wk-navmenu-ic svg{ width:17px; height:17px; }
+.wk-navmenu-item.active .wk-navmenu-ic{ color:var(--text); }
+.wk-navmenu-item.last{ margin-top:7px; padding-top:13px; border-top:1px solid var(--gray-100); }
+html.dark .wk-navmenu{ box-shadow:0 16px 40px -12px rgba(0,0,0,.7); }
+@media (prefers-reduced-motion:reduce){ .wk-navmenu{ animation:none; } .wk-ham.on svg{ transform:none; } }
+.wk-logo{ width:28px; height:28px; display:block; flex-shrink:0; filter:invert(1); } /* white art → dark on light bg */
+html.dark .wk-logo{ filter:none; } /* keep it white at night */
 .wk-ham{ width:30px; height:30px; border:none; background:none; color:var(--text); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; } .wk-ham svg{ width:21px; height:21px; }
 .wk-tr{ display:flex; gap:10px; }
 .wk-rb{ width:38px; height:38px; border-radius:50%; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
@@ -1247,6 +1272,7 @@ a { color: inherit; text-decoration: none; }
 .wk-wk-today:hover{ border-color:var(--text); color:var(--text); }
 .wk-wk-month{ display:flex; align-items:center; justify-content:center; gap:5px; width:fit-content; margin:0 auto; background:none; border:none; cursor:pointer; font-size:11.5px; font-weight:600; letter-spacing:.7px; text-transform:uppercase; color:var(--text-muted); padding:5px 12px; border-radius:999px; transition:background .14s; }
 .wk-wk-month:hover{ background:#f1f1ef; color:var(--text); }
+html.dark .wk-wk-month:hover{ background:var(--surface-alt); }
 .wk-wk-month .vr{ display:none; }
 .wk-wk-month:hover .vr{ display:inline; }
 .wk-wk-month svg{ color:var(--text-faint); }
@@ -1472,10 +1498,21 @@ a { color: inherit; text-decoration: none; }
 /* per-card status glyph (16px, borderless) + priority + due pill */
 .wk-cstat{ display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; padding:2px; opacity:.95; transition:opacity .12s; }
 .wk-cstat:hover{ opacity:.6; }
-.wk-prio{ display:inline-flex; align-items:center; }
-.wk-due{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; padding:2px 9px 2px 7px; border-radius:999px; background:#e7da6e; color:#5d520e; white-space:nowrap; flex-shrink:0; }
+.wk-prio{ display:inline-flex; align-items:center; color:var(--text); }
+/* solid-yellow running cards → dark bars regardless of theme */
+.wk-card.exp.run .wk-prio, html.dark .wk-card.exp.run .wk-prio, html:not(.dark) .wk-card.cond.run .wk-prio{ color:#161616; }
+/* Due pill: no solid fill — a faint tint of its own colour so it reads on any
+   surface (white card, dark card, yellow running card). Tone lives on the text. */
+.wk-due{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; padding:2px 9px 2px 7px; border-radius:999px; background:color-mix(in srgb, currentColor 13%, transparent); color:#8a7a1e; white-space:nowrap; flex-shrink:0; }
 .wk-due .wk-prio svg{ width:12px; height:12px; }
-.wk-due.near{ background:#fdf3e3; color:#9a6a12; } .wk-due.soon{ background:#fbe9e2; color:#b4502a; } .wk-due.over{ background:#fbe1e1; color:#c02626; }
+.wk-due.near{ color:#9a6a12; } .wk-due.soon{ color:#b4502a; } .wk-due.over{ color:#c02626; }
+/* brighter tones on dark surfaces */
+html.dark .wk-due{ color:#cdbf72; } html.dark .wk-due.near{ color:#e0a64e; } html.dark .wk-due.soon{ color:#ec7d55; } html.dark .wk-due.over{ color:#f06a6a; }
+/* solid-yellow running cards (light bg in both themes) → keep dark tone text */
+.wk-card.exp.run .wk-due, html.dark .wk-card.exp.run .wk-due, html:not(.dark) .wk-card.cond.run .wk-due{ color:#6e5f12; }
+.wk-card.exp.run .wk-due.near, html.dark .wk-card.exp.run .wk-due.near, html:not(.dark) .wk-card.cond.run .wk-due.near{ color:#8a5a10; }
+.wk-card.exp.run .wk-due.soon, html.dark .wk-card.exp.run .wk-due.soon, html:not(.dark) .wk-card.cond.run .wk-due.soon{ color:#9e4424; }
+.wk-card.exp.run .wk-due.over, html.dark .wk-card.exp.run .wk-due.over, html:not(.dark) .wk-card.cond.run .wk-due.over{ color:#a82020; }
 /* expanded: status + due pill row sits ABOVE the title */
 .wk-cinfo{ flex:1; min-width:0; }
 .wk-cmeta{ display:flex; align-items:center; gap:4px; margin-bottom:9px; }
@@ -1602,3 +1639,88 @@ body::after{
 @media (prefers-reduced-motion:reduce){
   body::before, body::after{ animation:none; }
 }
+
+/* ═══════════════ NIGHT MODE (auto 5pm–6am) ═══════════════ */
+html.dark{
+  --bg:#0d1117; --surface:#161c26; --surface-alt:#1c2330;
+  --text:#e7eaf0; --text-muted:#9aa4b3; --text-subtle:#8b95a4; --text-faint:#6b7585;
+  --gray-100:#2a323d;
+}
+html.dark body{ background:var(--bg); color:var(--text); }
+body, .wk-card, .wk-panel, .wk-pill, .wk-fpill, .wk-wk-today, .wk-stp-menu, .wk-pill-menu, .wk-pp, .wk-ed{
+  transition:background-color .5s ease, border-color .5s ease, color .35s ease;
+}
+
+/* day-view surfaces */
+html.dark .wk-card{ background:var(--surface); border-color:var(--gray-100); }
+/* collapsed running card: translucent yellow on dark (not white), light text */
+html.dark .wk-card.cond.run{ background:color-mix(in srgb, var(--wk-yellow) 13%, transparent); border-color:color-mix(in srgb, var(--wk-yellow) 36%, transparent); }
+html.dark .wk-card.cond.run .t, html.dark .wk-card.cond.run .nm{ color:var(--text); }
+html.dark .wk-card.cond.run .wk-pp{ background:var(--wk-yellow); color:#161616; border-color:var(--wk-yellow); }
+/* expanded running card stays solid yellow → dark text */
+html.dark .wk-card.exp.run{ background:var(--wk-yellow); border-color:var(--wk-yellow); }
+html.dark .wk-card.exp.run .nm, html.dark .wk-card.exp.run .time, html.dark .wk-card.exp.run .desc{ color:#161616; }
+html.dark .wk-card.exp.run .pj{ color:rgba(0,0,0,.58); }
+html.dark .wk-pp{ background:var(--surface); border-color:var(--gray-100); color:var(--text); }
+html.dark .wk-pp:hover{ border-color:var(--text); }
+html.dark .wk-ed{ border-color:var(--gray-100); color:var(--text-muted); }
+html.dark .wk-fpill, html.dark .wk-pill, html.dark .wk-wk-today{ background:var(--surface); color:var(--text); }
+html.dark .wk-fpill:hover, html.dark .wk-pill:hover, html.dark .wk-wk-today:hover{ background:var(--surface-alt); border-color:#3a4350; }
+html.dark .wk-fpill-n{ background:var(--gray-100); color:var(--text-muted); }
+html.dark .wk-wktot{ color:var(--text-muted); }
+
+/* dropdown menus */
+html.dark .wk-stp-menu, html.dark .wk-pill-menu{ background:var(--surface); border-color:var(--gray-100); box-shadow:0 14px 36px -10px rgba(0,0,0,.65); }
+html.dark .wk-stp-opt, html.dark .wk-pill-opt{ color:var(--text); }
+html.dark .wk-stp-opt:hover, html.dark .wk-pill-opt:hover{ background:var(--surface-alt); }
+
+/* side drawer */
+html.dark .wk-panel{ background:var(--surface); box-shadow:-16px 0 40px -12px rgba(0,0,0,.7); }
+html.dark .wk-ov{ background:rgba(0,0,0,.55); }
+html.dark .wk-fld input, html.dark .wk-fld select, html.dark .wk-fld textarea,
+html.dark .wk-ptitle, html.dark .wk-pdesc, html.dark .wk-pnotes, html.dark .wk-row-in{ color:var(--text); }
+/* running hours pill in the drawer keeps dark text on its yellow */
+html.dark .wk-row-in.run{ color:#3a3500; }
+/* the "running" indicator beside it reads yellow on the dark drawer */
+html.dark .wk-row.run .wk-ipp.run{ color:var(--wk-yellow); }
+/* selected week-strip day sits on a yellow disc → dark number */
+html.dark .wk-wk-day .num.sel{ color:#161616; }
+html.dark .wk-wk-day:hover .num:not(.sel){ background:var(--surface-alt); }
+html.dark .wk-wk-arrow:hover{ background:var(--surface-alt); }
+html.dark .wk-fpill.open{ background:var(--surface-alt); }
+html.dark .wk-trow:hover{ background:var(--surface-alt); }
+html.dark .wk-fld input, html.dark .wk-fld select, html.dark .wk-fld textarea{ border-bottom-color:var(--gray-100); }
+html.dark .wk-fld select{ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239aa4b3' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+html.dark .wk-row{ border-bottom-color:#222a35; }
+html.dark .wk-save{ background:var(--text); color:var(--bg); }
+html.dark .wk-del{ background:var(--surface); border-color:var(--gray-100); }
+html.dark .wk-datehidden{ color-scheme:dark; }
+html.dark input[type=date]{ color-scheme:dark; }
+
+/* nav + top chrome */
+html.dark .wk-sidenav, html.dark .wk-chat{ background:var(--bg); border-color:var(--gray-100); }
+html.dark .wk-nav-item{ color:var(--text-muted); }
+html.dark .wk-nav-item.active{ color:var(--text); }
+html.dark .wk-ham{ color:var(--text); }
+html.dark .wk-rb.wk-exp{ border-color:var(--gray-100); color:var(--text-muted); background:var(--surface); }
+
+/* recolor the ambient blobs to deep night hues (no white) */
+html.dark body::before{ background:radial-gradient(closest-side, rgba(44,60,118,.55), rgba(44,60,118,0) 72%); opacity:.5; }
+html.dark body::after{ background:radial-gradient(closest-side, rgba(28,70,84,.5), rgba(28,70,84,0) 72%); opacity:.5; }
+
+/* sky-dome → night sky */
+html.dark .wk-sun-arc, html.dark .wk-sun-tick{ stroke:#2a3342; }
+html.dark .wk-sun-tick.min{ stroke:#222a37; }
+html.dark .wk-sun-lab, html.dark .wk-sun-time, html.dark .wk-sun-tip{ color:#586477; }
+
+/* the moon: pale white with a bluish glow */
+.wk-sun-orb.moon{ width:120px; height:120px; filter:none;
+  background:radial-gradient(circle at 38% 34%, #f4f7fc 0%, #e6edf8 50%, #d3def1 80%, #c4d3ec 100%);
+  box-shadow:0 0 48px 12px rgba(190,212,248,.28), 0 0 120px 52px rgba(150,180,235,.15);
+  animation:wkMoonPulse 26s ease-in-out infinite; }
+@keyframes wkMoonPulse{
+  0%{ transform:translate(-50%,-50%) scale(1); }
+  50%{ transform:translate(-50%,-50%) scale(1.045); }
+  100%{ transform:translate(-50%,-50%) scale(1); }
+}
+@media (prefers-reduced-motion:reduce){ .wk-sun-orb.moon{ animation:none; transform:translate(-50%,-50%); } }
