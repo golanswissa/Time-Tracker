@@ -101,10 +101,12 @@ export function DayView() {
       .reduce((a, e) => a + entrySeconds(e, now), 0);
   }, [selectedDate, entries, now]);
 
-  const runningTaskId = entries.find((e) => e.isRunning)?.scheduledTaskId ?? null;
+  // A timer is "running here" only for the day its entry is dated on — so a task
+  // tracked today doesn't show as running when you look at other days.
+  const runningHereId = entries.find((e) => e.isRunning && e.date === selectedKey)?.scheduledTaskId ?? null;
   const expandedId =
     activeId && dayTasks.some((t) => t.id === activeId) ? activeId
-      : runningTaskId && dayTasks.some((t) => t.id === runningTaskId) ? runningTaskId
+      : runningHereId && dayTasks.some((t) => t.id === runningHereId) ? runningHereId
         : null;
 
   const getProject = (id?: string) => projects.find((p) => p.id === id);
@@ -127,7 +129,7 @@ export function DayView() {
   const expand = (t: ScheduledTask) => { setActiveId(t.id); openEdit(t.id); };
   // The play/pause button starts/stops tracking — and starting marks it Working.
   const onPlay = (t: ScheduledTask) => {
-    if (runningTaskId === t.id) stopTimer();
+    if (runningHereId === t.id) stopTimer();
     else { startTaskTimer(t.id, selectedKey); setTaskStatus(t.id, 'doing'); }
     setActiveId(t.id);
   };
@@ -186,7 +188,7 @@ export function DayView() {
           // strip). The estimate bar references the whole-task budget (all days).
           const dayTracked = actualSecondsForTaskOnDay(entries, t.id, selectedKey, now);
           const tracked = actualSecondsForTask(entries, t.id, now);
-          const running = runningTaskId === t.id;
+          const running = runningHereId === t.id;
           const worked = dayTracked > 0;
           const estS = (t.estimateHours || 0) * 3600;
           const overH = Math.round((tracked - estS) / 3600);
