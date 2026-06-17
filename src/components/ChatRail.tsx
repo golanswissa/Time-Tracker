@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useUI } from '../ui';
 import { useStore } from '../store';
 import { parseTasks, parseSingleTask, autoSchedule, detectIntent, type ParsedTask } from '../taskParser';
+import { aiCapture } from '../assistant';
 import type { TaskPriority } from '../types';
 import { parseDateKey, monthShort, todayKey } from '../utils';
 
@@ -40,9 +41,11 @@ export function ChatRail() {
   const chatOpen = useUI((s) => s.chatOpen);
   const toggleChat = useUI((s) => s.toggleChat);
   const projects = useStore((s) => s.projects);
+  const clients = useStore((s) => s.clients);
   const addScheduledTask = useStore((s) => s.addScheduledTask);
 
   const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
   const [thread, setThread] = useState<Msg[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -68,16 +71,36 @@ export function ChatRail() {
     return { id: uid(), role: 'assistant', text: `Here you go — ${parsed.length} tasks, spread across the week:`, rows: parsed.map((p) => ({ ...p, state: 'pending' as const })) };
   };
 
-  const send = () => {
-    if (!text.trim()) return;
-    const raw = text.trim();
+  // Local rule-based parse — the offline fallback when the AI backend is absent.
+  const localReply = (raw: string): Omit<Msg, 'id' | 'role'> => {
     const { mode, body } = detectIntent(raw);
-    const user: Msg = { id: uid(), role: 'user', text: raw };
-    const assistant: Msg = mode === 'ask'
-      ? { id: uid(), role: 'assistant', text: 'Got it — should I make this one task, or several?', clarify: { body } }
-      : buildAssistant(mode, body);
-    setThread((t) => [...t, user, assistant]);
+    if (mode === 'ask') return { text: 'Got it — should I make this one task, or several?', clarify: { body } };
+    const built = buildAssistant(mode, body);
+    return { text: built.text, rows: built.rows };
+  };
+
+  const send = async () => {
+    if (!text.trim() || busy) return;
+    const raw = text.trim();
+    const thinkingId = uid();
+    setThread((t) => [...t, { id: uid(), role: 'user', text: raw }, { id: thinkingId, role: 'assistant', text: 'Thinking…' }]);
     setText('');
+    setBusy(true);
+
+    // Try the Claude-powered assistant; if the backend isn't there, fall back local.
+    const ai = await aiCapture(raw, projects, clients).catch(() => null);
+    setBusy(false);
+
+    setThread((t) => t.map((m) => {
+      if (m.id !== thinkingId) return m;
+      if (ai) {
+        if (ai.clarify) return { ...m, text: ai.clarify };
+        if (!ai.tasks.length) return { ...m, text: "I couldn’t pull a task out of that — try again." };
+        const intro = ai.reply || (ai.tasks.length === 1 ? 'Here you go — one task:' : `Here you go — ${ai.tasks.length} tasks:`);
+        return { ...m, text: intro, rows: ai.tasks.map((p) => ({ ...p, state: 'pending' as const })) };
+      }
+      return { id: m.id, role: 'assistant', ...localReply(raw) };
+    }));
   };
 
   // resolve an "one or several?" prompt → replace it with the actual cards
@@ -221,7 +244,7 @@ export function ChatRail() {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }}
           />
-          <button className="wk-tf-send" onClick={send} disabled={!text.trim()} aria-label="Send"><ArrowUp /></button>
+          <button className="wk-tf-send" onClick={send} disabled={!text.trim() || busy} aria-label="Send"><ArrowUp /></button>
         </div>
       </div>
     </aside>
