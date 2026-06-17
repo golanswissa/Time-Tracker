@@ -1701,6 +1701,14 @@ html.dark input[type=date]{ color-scheme:dark; }
 
 /* nav + top chrome */
 html.dark .wk-sidenav, html.dark .wk-chat{ background:var(--bg); border-color:var(--gray-100); }
+/* assistant (Traffic) rail — dark surfaces */
+html.dark .wk-tf-card{ background:var(--surface); border-color:var(--gray-100); }
+html.dark .wk-tf-card.ok{ background:color-mix(in srgb, var(--wk-green) 16%, transparent); border-color:color-mix(in srgb, var(--wk-green) 34%, transparent); }
+html.dark .wk-tf-fitem, html.dark .wk-tf-opt, html.dark .wk-tf-cbtn{ background:var(--surface); }
+html.dark .wk-tf-fitem:hover, html.dark .wk-tf-opt:hover, html.dark .wk-tf-cbtn:hover{ border-color:var(--text); }
+html.dark .wk-tf-ta{ background:var(--surface); border-color:var(--gray-100); }
+html.dark .wk-tf-ta:focus{ background:var(--surface-alt); border-color:#3a4350; }
+html.dark .wk-tf-umsg .wk-tf-ubub{ background:var(--surface-alt); }
 html.dark .wk-nav-item{ color:var(--text-muted); }
 html.dark .wk-nav-item.active{ color:var(--text); }
 html.dark .wk-ham{ color:var(--text); }
