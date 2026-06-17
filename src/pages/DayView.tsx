@@ -39,6 +39,61 @@ function StatusPicker({ value, onPick, children }: {
   );
 }
 
+// The day-view filter is either a status (global board) or a day-scoped view.
+type FilterKey = TaskStatus | 'worked' | 'scheduled';
+const VIEW_META: Record<FilterKey, { label: string; c: string }> = {
+  ...STATUS_META,
+  worked: { label: 'Worked', c: '#0f7a45' },
+  scheduled: { label: 'Scheduled', c: '#2563eb' },
+};
+const IconWorked = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="13" r="8" /><path d="M12 9.5v3.5l2.4 1.4M9 2h6" /></svg>
+);
+const IconSched = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>
+);
+const viewIcon = (k: FilterKey) => (k === 'worked' ? <IconWorked /> : k === 'scheduled' ? <IconSched /> : <IconStatus status={k} />);
+
+/** Day-view filter: the four statuses, a divider, then the two day-scoped views. */
+function FilterPicker({ value, counts, onPick }: {
+  value: FilterKey; counts: Record<FilterKey, number>; onPick: (k: FilterKey) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+  const opt = (k: FilterKey) => (
+    <button key={k} className={`wk-stp-opt ${k === value ? 'on' : ''}`} onClick={(e) => { e.stopPropagation(); onPick(k); setOpen(false); }}>
+      <span className="wk-stp-ic" style={{ color: VIEW_META[k].c }}>{viewIcon(k)}</span>
+      <span className="wk-stp-lb">{VIEW_META[k].label}</span>
+      <span className="wk-fpill-n">{counts[k]}</span>
+      {k === value && <svg className="wk-stp-ck" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>}
+    </button>
+  );
+  return (
+    <div className="wk-stp" ref={ref}>
+      <button className="wk-stp-trig" onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>
+        <span className={`wk-fpill ${open ? 'open' : ''}`}>
+          <span className="wk-fpill-ic" style={{ color: VIEW_META[value].c }}>{viewIcon(value)}</span>
+          <span className="wk-fpill-lb">{VIEW_META[value].label}</span>
+          <span className="wk-fpill-n">{counts[value]}</span>
+        </span>
+      </button>
+      {open && (
+        <div className="wk-stp-menu">
+          {STATUS_ORDER.map(opt)}
+          <div className="wk-stp-div" />
+          {(['worked', 'scheduled'] as FilterKey[]).map(opt)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -56,7 +111,7 @@ export function DayView() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<TaskStatus>('doing');
+  const [statusFilter, setStatusFilter] = useState<FilterKey>('doing');
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -68,18 +123,40 @@ export function DayView() {
   // keep the shell's "+" button creating tasks on the day you're looking at
   useEffect(() => { setDayDate(selectedKey); }, [selectedKey, setDayDate]);
 
-  // Tasks always exist; the view is filtered by STATUS, not by the day.
-  // The selected day is the time-context (per-day hours + week strip). In Progress
-  // tasks simply persist until you change their status. List is priority-ordered.
-  const dayTasks = useMemo(
-    () => scheduledTasks.filter((t) => t.status === statusFilter).slice().sort(sortTasks),
-    [scheduledTasks, statusFilter]
-  );
+  // Smart default per day: a past day shows what you Worked, a future day shows
+  // what's Scheduled, today shows In Progress (your rolled-over current work).
+  // Manual picks stick until you navigate to another day, then snap to the default.
+  useEffect(() => {
+    const tk = todayKey();
+    setStatusFilter(selectedKey < tk ? 'worked' : selectedKey > tk ? 'scheduled' : 'doing');
+  }, [selectedKey]);
+
+  // Status views are global (the board). The two day-scoped views are tied to the
+  // selected day: "worked" = tasks with time logged that day (sorted by hours),
+  // "scheduled" = tasks planned for that day (Done hidden), priority-ordered.
+  const dayTasks = useMemo(() => {
+    if (statusFilter === 'worked') {
+      return scheduledTasks
+        .map((t) => ({ t, secs: actualSecondsForTaskOnDay(entries, t.id, selectedKey, now) }))
+        .filter((x) => x.secs > 0)
+        .sort((a, b) => b.secs - a.secs)
+        .map((x) => x.t);
+    }
+    if (statusFilter === 'scheduled') {
+      return scheduledTasks.filter((t) => t.date === selectedKey && t.status !== 'done').slice().sort(sortTasks);
+    }
+    return scheduledTasks.filter((t) => t.status === statusFilter).slice().sort(sortTasks);
+  }, [scheduledTasks, statusFilter, selectedKey, entries, now]);
+
   const counts = useMemo(() => {
-    const c: Record<TaskStatus, number> = { todo: 0, doing: 0, blocked: 0, done: 0 };
-    scheduledTasks.forEach((t) => { c[t.status] += 1; });
+    const c: Record<FilterKey, number> = { todo: 0, doing: 0, blocked: 0, done: 0, worked: 0, scheduled: 0 };
+    scheduledTasks.forEach((t) => {
+      c[t.status] += 1;
+      if (actualSecondsForTaskOnDay(entries, t.id, selectedKey, now) > 0) c.worked += 1;
+      if (t.date === selectedKey && t.status !== 'done') c.scheduled += 1;
+    });
     return c;
-  }, [scheduledTasks]);
+  }, [scheduledTasks, selectedKey, entries, now]);
 
   // ----- week strip (Sunday-first) + month total -----
   const weekDays = useMemo(() => {
@@ -159,15 +236,7 @@ export function DayView() {
       </div>
 
       <div className="wk-filter">
-        <StatusPicker value={statusFilter} onPick={setStatusFilter}>
-          {(open) => (
-            <span className={`wk-fpill ${open ? 'open' : ''}`}>
-              <span className="wk-fpill-ic" style={{ color: STATUS_META[statusFilter].c }}><IconStatus status={statusFilter} /></span>
-              <span className="wk-fpill-lb">{STATUS_META[statusFilter].label}</span>
-              <span className="wk-fpill-n">{counts[statusFilter]}</span>
-            </span>
-          )}
-        </StatusPicker>
+        <FilterPicker value={statusFilter} counts={counts} onPick={setStatusFilter} />
         <div className="wk-filter-right">
           <span className="wk-wktot">Week Total: {formatHMS(weekTotal)}</span>
           {!isToday && <button className="wk-wk-today" onClick={() => setSelectedDate(new Date())}>Today</button>}
@@ -177,7 +246,9 @@ export function DayView() {
       <div className="wk-list">
         {dayTasks.length === 0 && (
           <div className="wk-empty">
-            No {STATUS_META[statusFilter].label.toLowerCase()} tasks — hit <b>+</b> to add one{' '}
+            {statusFilter === 'worked' ? 'Nothing logged on this day'
+              : statusFilter === 'scheduled' ? 'Nothing scheduled for this day'
+                : `No ${VIEW_META[statusFilter].label.toLowerCase()} tasks`} — hit <b>+</b> to add one{' '}
             <button className="wk-today" style={{ marginLeft: 6 }} onClick={() => openCreate({ date: selectedKey })}>New task</button>
           </div>
         )}
