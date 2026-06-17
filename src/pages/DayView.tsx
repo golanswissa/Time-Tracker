@@ -199,7 +199,7 @@ export function DayView() {
               {() => <span className="wk-cstat" style={{ color: STATUS_META[t.status].c }} title={STATUS_META[t.status].label}><IconStatus status={t.status} size={16} /></span>}
             </StatusPicker>
           );
-          // Priority bars live inside the due pill; without a deadline, bars alone.
+          // Priority bars + due label are ONE pill. With no deadline, bars alone.
           const prioBars = <span className="wk-prio" style={{ color: prioColor }} title={PRIORITY_META[t.priority].label}><IconPriority level={t.priority} /></span>;
           const metaPill = due
             ? <span className={`wk-due ${due.tone}`}>{prioBars}{due.label}</span>
@@ -235,10 +235,10 @@ export function DayView() {
           }
           return (
             <div key={t.id} className={`wk-card cond ${running ? 'run' : worked ? 'done' : ''}`} onClick={() => expand(t)}>
-              {statusGlyph}
               <div className="wk-cbody">
-                <span className="nm">{t.title}</span>
+                {statusGlyph}
                 {metaPill}
+                <span className="nm">{t.title}</span>
               </div>
               <div className="t mono" title={over ? `${overH}h over estimate` : undefined}>{formatHMS(dayTracked, running)}</div>
               <button className="wk-pp" onClick={(e) => { e.stopPropagation(); onPlay(t); }}>{running ? <IconPause /> : <IconPlay />}</button>

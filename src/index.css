@@ -1478,10 +1478,11 @@ a { color: inherit; text-decoration: none; }
 .wk-due.near{ background:#fdf3e3; color:#9a6a12; } .wk-due.soon{ background:#fbe9e2; color:#b4502a; } .wk-due.over{ background:#fbe1e1; color:#c02626; }
 /* expanded: status + due pill row sits ABOVE the title */
 .wk-cinfo{ flex:1; min-width:0; }
-.wk-cmeta{ display:flex; align-items:center; gap:9px; margin-bottom:9px; }
-/* collapsed: 16px status · title · due pill, then time + play */
-.wk-card.cond .wk-cbody{ flex:1; min-width:0; display:flex; align-items:center; gap:9px; }
-.wk-card.cond .wk-cbody .nm{ font-size:14px; font-weight:600; letter-spacing:-.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wk-cmeta{ display:flex; align-items:center; gap:4px; margin-bottom:9px; }
+/* collapsed: 16px status · due pill · title, then time + play */
+.wk-card.cond .wk-cbody{ flex:1; min-width:0; display:flex; align-items:center; gap:4px; }
+.wk-card.cond .wk-cbody .wk-stp{ flex-shrink:0; }
+.wk-card.cond .wk-cbody .nm{ flex:1; min-width:0; margin-left:6px; font-size:14px; font-weight:600; letter-spacing:-.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wk-card.cond .wk-cbody .wk-prio{ flex-shrink:0; }
 
 /* ───────── ambient sky-dome background ───────── */
