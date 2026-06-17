@@ -128,7 +128,7 @@ export function DayView() {
   // The play/pause button starts/stops tracking — and starting marks it Working.
   const onPlay = (t: ScheduledTask) => {
     if (runningTaskId === t.id) stopTimer();
-    else { startTaskTimer(t.id); setTaskStatus(t.id, 'doing'); }
+    else { startTaskTimer(t.id, selectedKey); setTaskStatus(t.id, 'doing'); }
     setActiveId(t.id);
   };
 

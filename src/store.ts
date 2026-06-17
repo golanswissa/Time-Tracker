@@ -100,7 +100,7 @@ interface Actions {
   moveTaskToDay: (id: string, date: string) => void;
   setTaskStatus: (id: string, status: TaskStatus) => void;
   /** Start (or restart) a timer tracked against a scheduled task. */
-  startTaskTimer: (taskId: string) => Entry | undefined;
+  startTaskTimer: (taskId: string, dateKey?: string) => Entry | undefined;
   /**
    * Manually set a task's tracked time for a single day (defaults to today).
    * Only that day's entries are rewritten; other days are untouched.
@@ -590,7 +590,7 @@ export const useStore = create<Store>()(
         set((s) => ({
           scheduledTasks: s.scheduledTasks.map((t) => (t.id === id ? { ...t, status } : t)),
         })),
-      startTaskTimer: (taskId) => {
+      startTaskTimer: (taskId, dateKey) => {
         const state = get();
         const task = state.scheduledTasks.find((t) => t.id === taskId);
         if (!task) return undefined;
@@ -603,7 +603,9 @@ export const useStore = create<Store>()(
           projectId,
           taskId: category,
           notes: task.title,
-          date: todayKey(),
+          // Track against the day you're viewing (defaults to today), so the time
+          // lands on the same day the card shows — matching the hours editor.
+          date: dateKey || todayKey(),
           durationSeconds: 0,
           isRunning: true,
           startedAt: new Date().toISOString(),

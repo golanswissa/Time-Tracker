@@ -227,7 +227,7 @@ export function TaskPanel() {
       closePanel();
     }
   };
-  const onInlineTimer = () => { if (task) running ? stopTimer() : startTaskTimer(task.id); };
+  const onInlineTimer = () => { if (task) running ? stopTimer() : startTaskTimer(task.id, dayDate); };
 
   return (
     <>
