@@ -130,6 +130,7 @@ const initialState: State = {
   settings: {
     weekStart: 'mon',
     timeFormat: 'hhmm',
+    themeMode: 'auto',
     currencySymbol: '$',
     invoicing: DEFAULT_INVOICING,
   },

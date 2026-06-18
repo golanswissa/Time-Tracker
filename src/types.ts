@@ -115,6 +115,8 @@ export interface ScheduledTask {
 
 export type WeekStart = 'mon' | 'sun';
 export type TimeFormat = 'hhmm' | 'decimal';
+/** Theme: follow the clock (5pm–6am = night), or force day/night. */
+export type ThemeMode = 'auto' | 'day' | 'night';
 
 export interface InvoiceFromDetails {
   name?: string;
@@ -149,6 +151,8 @@ export interface InvoicingSettings {
 export interface Settings {
   weekStart: WeekStart;
   timeFormat: TimeFormat;
+  /** Theme override; defaults to 'auto' (time-based). */
+  themeMode?: ThemeMode;
   currencySymbol: string;
   defaultProjectId?: string;
   defaultTaskId?: string;

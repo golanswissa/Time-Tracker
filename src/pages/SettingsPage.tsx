@@ -76,6 +76,17 @@ export function SettingsPage() {
             <button className={settings.timeFormat === 'decimal' ? 'active' : ''} onClick={() => updateSettings({ timeFormat: 'decimal' })}>Decimal</button>
           </div>
         </div>
+        <div className="settings-row">
+          <div>
+            <div className="label">Appearance</div>
+            <div className="sub">Auto follows the clock (night 5pm–6am). Day / Night force it on.</div>
+          </div>
+          <div className="seg">
+            <button className={(settings.themeMode ?? 'auto') === 'auto' ? 'active' : ''} onClick={() => updateSettings({ themeMode: 'auto' })}>Auto</button>
+            <button className={settings.themeMode === 'day' ? 'active' : ''} onClick={() => updateSettings({ themeMode: 'day' })}>Day</button>
+            <button className={settings.themeMode === 'night' ? 'active' : ''} onClick={() => updateSettings({ themeMode: 'night' })}>Night</button>
+          </div>
+        </div>
       </div>
 
       <div className="settings-section">

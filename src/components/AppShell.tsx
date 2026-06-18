@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Route } from '../types';
 import { useUI } from '../ui';
+import { useStore } from '../store';
 import { ChatRail } from './ChatRail';
 import { TaskPanel } from './TaskPanel';
 import { SunArc } from './SunArc';
@@ -50,20 +51,19 @@ export function AppShell({ route, onNavigate, children }: Props) {
 
   // Auto night mode: dark from 5pm to 6am. Toggles a class on <html> so the
   // whole site re-themes; the sun-arc swaps its sun for a moon to match.
-  const [, setNight] = useState(() => { const h = new Date().getHours(); return h >= 17 || h < 6; });
+  const themeMode = useStore((s) => s.settings.themeMode) ?? 'auto';
   useEffect(() => {
-    // Enforce the theme on every tick (not just on change) so the class can't
-    // get stuck in the wrong state.
+    // Enforce the theme on every tick. 'day'/'night' override the clock;
+    // 'auto' follows it (night from 5pm to 6am).
     const apply = () => {
       const h = new Date().getHours();
-      const isNight = h >= 17 || h < 6;
-      setNight(isNight);
+      const isNight = themeMode === 'night' ? true : themeMode === 'day' ? false : (h >= 17 || h < 6);
       document.documentElement.classList.toggle('dark', isNight);
     };
     apply();
     const id = setInterval(apply, 30000);
     return () => clearInterval(id);
-  }, []);
+  }, [themeMode]);
 
   return (
     <div className="wk-app">

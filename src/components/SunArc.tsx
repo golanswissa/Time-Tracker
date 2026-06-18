@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useStore } from '../store';
 
 // Ambient "sky dome": a faint arc across the screen with the sun riding along it
 // by local time. Daytime window is fixed (no geolocation prompt).
@@ -31,6 +32,7 @@ function tipFor(h: number): string {
 }
 
 export function SunArc() {
+  const themeMode = useStore((s) => s.settings.themeMode) ?? 'auto';
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -38,15 +40,16 @@ export function SunArc() {
   }, []);
 
   const h = now.getHours() + now.getMinutes() / 60;
-  // Night from 5pm to 6am. Day arc spans 6a→8p (sun); night arc spans 8p→6a
-  // (moon rises on the left at 8pm, sets on the right at 6am = sunrise).
-  const dark = h >= 17 || h < 6;
+  // Night from 5pm to 6am (or forced via themeMode). Day arc spans 6a→8p (sun);
+  // night arc spans 8p→6a (moon rises left at 8pm, sets right at 6am = sunrise).
+  const clockDark = h >= 17 || h < 6;
+  const dark = themeMode === 'night' ? true : themeMode === 'day' ? false : clockDark;
   const START = dark ? 20 : DAY_START;   // night starts 20:00
   const END = dark ? 30 : DAY_END;       // night ends 06:00 (= 30 on a 24h+ scale)
   const hh = dark && h < 6 ? h + 24 : h; // wrap post-midnight hours onto the night scale
   const f = Math.max(0, Math.min(1, (hh - START) / (END - START)));
   const orb = pointAt(f);
-  const showOrb = dark || (h >= DAY_START && h <= DAY_END);
+  const showOrb = themeMode !== 'auto' ? true : (dark || (h >= DAY_START && h <= DAY_END));
 
   const fmtHour = (hr: number) => {
     const x = ((Math.round(hr) % 24) + 24) % 24;
