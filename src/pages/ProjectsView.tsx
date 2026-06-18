@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
-import { ProjectModal } from '../components/ProjectModal';
+import { ProjectPanel } from '../components/ProjectPanel';
 import { actualSecondsForTask, sortTasks, STATUS_META } from '../planner';
 import { entrySeconds, formatHMS, monthShort, parseDateKey } from '../utils';
-import type { Project } from '../types';
-import { IconPlus, IconPencil } from '../components/icons';
+import type { Project, TaskStatus } from '../types';
+import { IconPencil, IconStatus, IconTimelapse, IconTimer } from '../components/icons';
+import { ProjectMark } from '../components/ProjectMark';
+import { StatusPicker } from '../components/StatusPicker';
 
 export function ProjectsView() {
   const projects = useStore((s) => s.projects);
   const clients = useStore((s) => s.clients);
   const scheduledTasks = useStore((s) => s.scheduledTasks);
   const entries = useStore((s) => s.entries);
+  const setTaskStatus = useStore((s) => s.setTaskStatus);
   const openCreate = useUI((s) => s.openCreate);
   const openEdit = useUI((s) => s.openEdit);
 
@@ -86,19 +89,19 @@ export function ProjectsView() {
             const d = parseDateKey(t.date);
             const isRun = runningTask?.id === t.id;
             return (
-              <button key={t.id} className="wk-trow" onClick={() => openEdit(t.id)}>
-                <span className="wk-st" style={{ color: sc.c }}><span className="wk-dot" style={{ background: sc.c }} />{sc.label}</span>
+              <div key={t.id} className="wk-trow" onClick={() => openEdit(t.id)} role="button" tabIndex={0}>
+                <StatusPicker value={t.status} onPick={(s) => setTaskStatus(t.id, s)}>
+                  {() => <span className="wk-st" style={{ color: sc.c }} title={sc.label}><IconStatus status={t.status} size={15} />{sc.label}</span>}
+                </StatusPicker>
                 <span className="wk-tr-nm">{t.title}</span>
                 <span className="wk-tr-date">{monthShort(d)} {d.getDate()}</span>
                 <span className={`wk-tr-t mono ${isRun ? 'run' : tracked > 0 ? 'has' : ''}`}>{formatHMS(tracked, isRun)}</span>
-              </button>
+              </div>
             );
           })}
         </div>
 
-        {modal !== null && (
-          <ProjectModal project={modal === 'new' ? null : modal} onClose={() => setModal(null)} />
-        )}
+        <ProjectPanel project={modal === 'new' ? null : modal} open={modal !== null} onClose={() => setModal(null)} />
       </div>
     );
   }
@@ -108,7 +111,7 @@ export function ProjectsView() {
     <div className="wk-pwrap">
       <div className="wk-phead">
         <h1>Projects</h1>
-        <button className="wk-pfab" onClick={() => setModal('new')} title="New project"><IconPlus /></button>
+        <button className="wk-today" onClick={() => setModal('new')}>+ Add project</button>
       </div>
       <div className="wk-pgrid">
         {projects.map((p) => {
@@ -118,25 +121,29 @@ export function ProjectsView() {
           const runSecs = running && runningTask ? actualSecondsForTask(entries, runningTask.id, now) : 0;
           return (
             <button key={p.id} className={`wk-pcard ${running ? 'run' : ''}`} onClick={() => setSelected(p.id)}>
-              <div className="wk-pc-head">
-                <div className="wk-pc-text">
-                  <div className="wk-pc-cl">{c?.name || '—'}</div>
-                  <div className="wk-pc-nm">{p.name}</div>
-                </div>
-                {running && <div className="wk-pc-timer mono"><span className="wk-rdot" />{formatHMS(runSecs, true)}</div>}
+              {p.image ? (
+                <div className="wk-pc-art"><img src={p.image} alt="" /></div>
+              ) : (
+                <div className="wk-pc-art"><ProjectMark /></div>
+              )}
+              <div className="wk-pc-text">
+                <div className="wk-pc-cl">{c?.name || '—'}</div>
+                <div className="wk-pc-nm">{p.name}</div>
+                {p.description && <div className="wk-pc-desc">{p.description}</div>}
               </div>
-              {p.description && <div className="wk-pc-desc">{p.description}</div>}
-              <div className="wk-pc-stats mono">
-                {formatHMS(s.secs)} · {s.open} open{s.done ? ` · ${s.done} done` : ''}
+              <div className="wk-pc-stats">
+                <span className="wk-pc-stat"><IconTimelapse /> {s.open} open</span>
+                <span className="wk-pc-stat right">
+                  <IconTimer />
+                  <span className="mono">{running ? <><span className="wk-rdot run" />{formatHMS(runSecs, true)}</> : formatHMS(s.secs)}</span>
+                </span>
               </div>
             </button>
           );
         })}
       </div>
 
-      {modal !== null && (
-        <ProjectModal project={modal === 'new' ? null : modal} onClose={() => setModal(null)} />
-      )}
+      <ProjectPanel project={modal === 'new' ? null : modal} open={modal !== null} onClose={() => setModal(null)} />
     </div>
   );
 }

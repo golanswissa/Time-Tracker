@@ -1,43 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { useStore } from '../store';
 import { useUI } from '../ui';
 import { actualSecondsForTask, actualSecondsForTaskOnDay, dueInfo, PRIORITY_META, sortTasks, STATUS_META, STATUS_ORDER } from '../planner';
 import { addDays, entrySeconds, formatHMS, parseDateKey, toDateKey, todayKey } from '../utils';
 import type { ScheduledTask, TaskStatus } from '../types';
 import { IconPause, IconPencil, IconPlay, IconStatus, IconPriority } from '../components/icons';
-
-/** Status picker: a trigger you render, plus a dropdown of the four statuses. */
-function StatusPicker({ value, onPick, children }: {
-  value: TaskStatus; onPick: (s: TaskStatus) => void; children: (open: boolean) => ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [open]);
-  return (
-    <div className="wk-stp" ref={ref}>
-      <button className="wk-stp-trig" onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{children(open)}</button>
-      {open && (
-        <div className="wk-stp-menu" onClick={(e) => e.stopPropagation()}>
-          {STATUS_ORDER.map((s) => (
-            <button key={s} className={`wk-stp-opt ${s === value ? 'on' : ''}`} onClick={(e) => { e.stopPropagation(); onPick(s); setOpen(false); }}>
-              <span className="wk-stp-ic" style={{ color: STATUS_META[s].c }}><IconStatus status={s} /></span>
-              <span className="wk-stp-lb">{STATUS_META[s].label}</span>
-              {s === value && (
-                <svg className="wk-stp-ck" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import { StatusPicker } from '../components/StatusPicker';
 
 // The day-view filter is either a status (global board) or a day-scoped view.
 type FilterKey = TaskStatus | 'worked' | 'scheduled';

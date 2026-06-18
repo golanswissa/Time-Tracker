@@ -1468,6 +1468,8 @@ html.dark .wk-wk-month:hover{ background:var(--surface-alt); }
 .wk-hline{ display:flex; align-items:center; gap:12px; border-bottom:1.5px solid var(--gray-100); } .wk-hline input{ border:none !important; flex:1; }
 .wk-ipp{ border:none; background:none; cursor:pointer; color:var(--text-muted); display:inline-flex; align-items:center; gap:5px; font-size:11.5px; white-space:nowrap; } .wk-ipp svg{ width:13px; height:13px; } .wk-ipp.run{ color:var(--text); }
 .wk-rocum{ margin-top:-6px; } .wk-rocum-val{ font-size:13px; color:var(--text-muted); padding:6px 0; }
+.wk-billtoggle{ display:flex; align-items:center; justify-content:space-between; width:100%; padding:6px 0; background:none; border:none; cursor:pointer; color:var(--text); font-size:13px; font-weight:600; text-transform:none; letter-spacing:0; }
+.wk-billtoggle .muted{ color:var(--text-muted); font-size:12px; font-weight:500; }
 .wk-pfoot{ display:flex; align-items:center; margin-top:auto; padding-top:16px; }
 .wk-del{ border:1px solid var(--gray-100); background:#fff; width:38px; height:38px; border-radius:9px; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; } .wk-del:hover{ color:var(--wk-red); border-color:#e3c9bf; } .wk-del svg{ width:15px; height:15px; }
 .wk-save{ margin-left:auto; height:38px; padding:0 24px; border-radius:9px; border:none; background:var(--ink, #161616); color:#fff; font-weight:600; font-size:13px; cursor:pointer; }
@@ -1551,33 +1553,39 @@ html.dark .wk-due{ color:#cdbf72; } html.dark .wk-due.near{ color:#e0a64e; } htm
 .wk-phead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
 .wk-phead h1{ font-size:26px; font-weight:700; letter-spacing:-.8px; }
 
-/* circular dark "+" button */
-.wk-pfab{ width:40px; height:40px; border-radius:50%; background:var(--ink, #161616); color:#fff; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:transform .12s, background .15s; }
-.wk-pfab:hover{ transform:scale(1.06); }
-.wk-pfab svg{ width:18px; height:18px; }
-
 /* project cards — same treatment as task cards, up to 2 per row, white.
    auto-fit collapses empty tracks so a single card fills the width
    instead of sitting cramped in a corner. */
 .wk-pgrid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
-.wk-pcard{ background:#fff; border:1px solid var(--gray-100); border-radius:4px; cursor:pointer; text-align:left; padding:18px 20px 20px; display:flex; flex-direction:column; transition:border-color .15s, background .15s; }
+.wk-pcard{ background:var(--surface); border:1px solid var(--gray-100); border-radius:2px; cursor:pointer; text-align:left; padding:24px; display:flex; flex-direction:column; gap:24px; transition:border-color .15s, background .15s; }
 .wk-pcard:hover{ border-color:#d6d6da; }
-.wk-pc-head{ display:flex; align-items:flex-start; gap:12px; }
-.wk-pc-text{ min-width:0; }
-.wk-pc-cl{ font-size:12px; color:var(--text-muted); }
-.wk-pc-nm{ font-size:20px; font-weight:600; letter-spacing:-.3px; margin-top:2px; }
-.wk-pc-timer{ margin-left:auto; display:flex; align-items:center; gap:6px; font-size:16px; font-weight:500; white-space:nowrap; }
-.wk-pc-desc{ font-size:13px; line-height:1.5; color:var(--text-muted); margin-top:10px; }
-.wk-pc-stats{ font-size:14px; color:var(--text-muted); margin-top:14px; }
+/* project avatar: sun by day, moon by night — matches the SunArc orb */
+.wk-pc-art{ position:relative; width:104px; height:104px; flex-shrink:0; }
+.wk-pc-art img{ width:104px; height:104px; object-fit:cover; border-radius:2px; display:block; }
+.wk-pc-orb{ width:84px; height:84px; margin:10px; border-radius:50%;
+  background:radial-gradient(circle at 38% 34%, #ff7e4d 0%, #ff5a26 46%, #ff3700 82%, #e83100 100%);
+  box-shadow:0 0 28px 6px rgba(255,55,0,.26), 0 0 60px 22px rgba(255,55,0,.12); }
+html.dark .wk-pc-orb{
+  background:radial-gradient(circle at 38% 34%, #f4f7fc 0%, #e6edf8 50%, #d3def1 80%, #c4d3ec 100%);
+  box-shadow:0 0 28px 6px rgba(190,212,248,.26), 0 0 60px 22px rgba(150,180,235,.12); }
+.wk-pc-text{ min-width:0; display:flex; flex-direction:column; gap:3px; }
+.wk-pc-cl{ font-size:12px; line-height:18px; font-weight:500; color:#fc704a; word-break:break-word; }
+.wk-pc-nm{ font-size:20px; line-height:26px; font-weight:500; letter-spacing:0; color:var(--text); word-break:break-word; }
+.wk-pc-desc{ font-size:14px; line-height:20px; color:var(--text-muted); word-break:break-word; }
+.wk-pc-stats{ display:flex; align-items:center; justify-content:space-between; font-size:12px; line-height:18px; color:var(--text-muted); }
+.wk-pc-stat{ display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+.wk-pc-stat svg{ flex-shrink:0; }
 /* running project = yellow, like an active card */
 .wk-pcard.run{ background:var(--wk-yellow); border-color:var(--wk-yellow); }
-.wk-pcard.run .wk-pc-cl,
+.wk-pcard.run .wk-pc-cl{ color:#b4502a; }
+.wk-pcard.run .wk-pc-nm{ color:#161616; }
 .wk-pcard.run .wk-pc-desc,
 .wk-pcard.run .wk-pc-stats{ color:rgba(0,0,0,.6); }
 .wk-rdot{ width:7px; height:7px; border-radius:50%; background:var(--ink, #161616); display:inline-block; }
+.wk-rdot.run{ background:#b4502a; margin-right:5px; }
 
 /* project detail header — clean typographic, no heavy art */
-.wk-pdetail{ margin-bottom:24px; padding:20px 22px; border:1px solid var(--gray-100); border-radius:4px; background:#fff; }
+.wk-pdetail{ margin-bottom:24px; padding:20px 22px; border:1px solid var(--gray-100); border-radius:4px; background:var(--surface); }
 .wk-pdetail.run{ background:var(--wk-yellow); border-color:var(--wk-yellow); }
 .wk-pd-top{ display:flex; align-items:flex-start; gap:14px; }
 .wk-pd-text{ min-width:0; }
@@ -1596,8 +1604,10 @@ html.dark .wk-due{ color:#cdbf72; } html.dark .wk-due.near{ color:#e0a64e; } htm
 .wk-pd-tasksbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:13px; font-weight:600; }
 .wk-tasklist{ display:flex; flex-direction:column; }
 .wk-trow{ display:flex; align-items:center; gap:14px; padding:12px 6px; border-bottom:1px solid var(--gray-100); background:none; cursor:pointer; text-align:left; width:100%; }
-.wk-trow:hover{ background:#fafafa; }
-.wk-st{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; width:74px; flex-shrink:0; }
+.wk-trow:hover{ background:var(--surface-alt); }
+.wk-trow .wk-stp{ flex-shrink:0; }
+.wk-st{ display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; min-width:104px; flex-shrink:0; white-space:nowrap; }
+.wk-st svg{ flex-shrink:0; }
 .wk-tr-nm{ font-size:14px; font-weight:500; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wk-tr-date{ font-size:12px; color:var(--text-faint); width:54px; flex-shrink:0; }
 .wk-tr-t{ font-size:13px; color:var(--text-faint); width:60px; text-align:right; flex-shrink:0; }
@@ -1643,7 +1653,13 @@ html.dark{
   --bg:#0d1117; --surface:#161c26; --surface-alt:#1c2330;
   --text:#e7eaf0; --text-muted:#9aa4b3; --text-subtle:#8b95a4; --text-faint:#6b7585;
   --gray-100:#2a323d;
+  /* 1px "ring" borders must be dark in dark mode, not the near-white light theme value */
+  --ring: rgba(255,255,255,0.10) 0px 0px 0px 1px;
+  --ring-light: rgb(42,50,61) 0px 0px 0px 1px;
 }
+/* primary (dark) buttons invert to high-contrast in dark mode, like the drawer Save */
+html.dark .btn-dark, html.dark .btn-stop{ background:var(--text); color:var(--bg); }
+html.dark .btn-dark:hover, html.dark .btn-stop:hover{ background:#fff; }
 html.dark body{ background:var(--bg); color:var(--text); }
 body, .wk-card, .wk-panel, .wk-pill, .wk-fpill, .wk-wk-today, .wk-stp-menu, .wk-pill-menu, .wk-pp, .wk-ed{
   transition:background-color .5s ease, border-color .5s ease, color .35s ease;

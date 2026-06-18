@@ -5,7 +5,7 @@ import { actualSecondsForTask, actualSecondsForTaskOnDay, STATUS_META, STATUS_OR
 import { dayShort, formatHMS, monthShort, parseDateKey, todayKey } from '../utils';
 import type { TaskKind, TaskPriority, TaskStatus } from '../types';
 import { IconPlayS, IconPauseS, IconTrash, IconStatus, IconPriority, IconKind, IconCal } from './icons';
-import type { ReactNode } from 'react';
+import { PillSelect } from './PillSelect';
 
 // urgency — three levels (asap collapses into High)
 const PRIO3: { v: TaskPriority; label: string; c: string }[] = [
@@ -76,45 +76,6 @@ function DatePill({ value, onChange, placeholder }: { value: string; onChange: (
       </button>
       <input ref={ref} type="date" className="wk-datehidden" value={value} onChange={(e) => onChange(e.target.value)} tabIndex={-1} />
     </span>
-  );
-}
-
-interface PillOption { value: string; label: string; icon?: ReactNode }
-
-/** Compact property pill — shows the current value's icon + label, opens a menu to change it. */
-function PillSelect({ value, options, onChange }: {
-  value: string; options: PillOption[]; onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, [open]);
-  const sel = options.find((o) => o.value === value) || options[0];
-  return (
-    <div className="wk-pill-wrap" ref={ref}>
-      <button type="button" className={`wk-pill ${open ? 'open' : ''}`} onClick={() => setOpen((o) => !o)}>
-        {sel?.icon && <span className="wk-pill-ic">{sel.icon}</span>}
-        <span>{sel?.label ?? '—'}</span>
-      </button>
-      {open && (
-        <div className="wk-pill-menu">
-          {options.map((o) => (
-            <button key={o.value || '_'} type="button" className={`wk-pill-opt ${o.value === value ? 'on' : ''}`}
-              onClick={() => { onChange(o.value); setOpen(false); }}>
-              {o.icon && <span className="wk-pill-ic">{o.icon}</span>}
-              <span className="wk-pill-lbl">{o.label}</span>
-              {o.value === value && (
-                <svg className="ck" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 

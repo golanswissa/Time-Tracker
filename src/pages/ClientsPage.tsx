@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, FileText, Pencil, Plus } from 'lucide-react';
 import { useStore } from '../store';
-import { ClientModal } from '../components/ClientModal';
-import { ProjectModal } from '../components/ProjectModal';
+import { ClientPanel } from '../components/ClientPanel';
+import { ProjectPanel } from '../components/ProjectPanel';
 import type { Client, Project } from '../types';
 import {
   effectiveRate,
@@ -150,7 +150,7 @@ function ClientList({ onSelect }: { onSelect: (id: string) => void }) {
         })}
       </div>
 
-      {editing !== undefined && <ClientModal client={editing} onClose={() => setEditing(undefined)} />}
+      <ClientPanel client={editing ?? null} open={editing !== undefined} onClose={() => setEditing(undefined)} />
     </div>
   );
 }
@@ -360,14 +360,13 @@ function ClientDetail({
         ))}
       </div>
 
-      {editingClient && <ClientModal client={client} onClose={() => setEditingClient(false)} />}
-      {editingProject !== undefined && (
-        <ProjectModal
-          project={editingProject}
-          defaultClientId={client.id}
-          onClose={() => setEditingProject(undefined)}
-        />
-      )}
+      <ClientPanel client={editingClient ? client : null} open={editingClient} onClose={() => setEditingClient(false)} />
+      <ProjectPanel
+        project={editingProject ?? null}
+        open={editingProject !== undefined}
+        defaultClientId={client.id}
+        onClose={() => setEditingProject(undefined)}
+      />
     </div>
   );
 }
