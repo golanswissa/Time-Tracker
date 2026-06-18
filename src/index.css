@@ -1660,6 +1660,8 @@ html.dark{
 /* primary (dark) buttons invert to high-contrast in dark mode, like the drawer Save */
 html.dark .btn-dark, html.dark .btn-stop{ background:var(--text); color:var(--bg); }
 html.dark .btn-dark:hover, html.dark .btn-stop:hover{ background:#fff; }
+/* segmented-control active pill: high-contrast in dark mode (was muddy #171717) */
+html.dark .seg button.active{ background:var(--text); color:var(--bg); }
 html.dark body{ background:var(--bg); color:var(--text); }
 body, .wk-card, .wk-panel, .wk-pill, .wk-fpill, .wk-wk-today, .wk-stp-menu, .wk-pill-menu, .wk-pp, .wk-ed{
   transition:background-color .5s ease, border-color .5s ease, color .35s ease;
