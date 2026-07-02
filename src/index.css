@@ -661,7 +661,10 @@ a { color: inherit; text-decoration: none; }
 @media print {
   @page {
     size: A4;
-    margin: 18mm 16mm;
+    /* margin:0 suppresses the browser's own print header/footer (the date +
+       "Tracker" title line). Page margins are added back as padding on the
+       printed containers below. */
+    margin: 0;
   }
   /* On screen, html/body/#root use height:100% + overflow-x:hidden. Because one
      overflow axis is hidden, the other computes to `auto`, making them bounded
@@ -677,7 +680,7 @@ a { color: inherit; text-decoration: none; }
   .no-print { display: none !important; }
   .print-only { display: block; }
   .topnav { display: none !important; }
-  .page { padding: 0 !important; max-width: 100% !important; }
+  .page { padding: 14mm 15mm !important; max-width: 100% !important; }
   .report-page h1, .report-page h2 { color: #000; }
 
   /* Kill all shadows/rounded cards for print */
@@ -997,10 +1000,13 @@ a { color: inherit; text-decoration: none; }
   .invoice-doc {
     box-shadow: none !important;
     border-radius: 0 !important;
-    padding: 0 !important;
+    /* page margin now comes from here (since @page margin is 0) */
+    padding: 16mm 15mm !important;
     margin: 0 !important;
     max-width: 100% !important;
   }
+  /* belt-and-braces: no element inside the printed invoice casts a shadow */
+  .invoice-doc, .invoice-doc * { box-shadow: none !important; }
   .invoice-page .topbar { display: none !important; }
   .inv-input {
     border: none !important;
