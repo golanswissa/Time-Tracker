@@ -23,10 +23,11 @@ interface Props {
   initialClientId?: string | null;
   onConsumedInitial?: () => void;
   onOpenInvoice: (id: string) => void;
+  onOpenQuote: (id: string) => void;
 }
 
 /** Flow: select client → select month → month detail (printable). */
-export function ReportsPage({ initialClientId, onConsumedInitial, onOpenInvoice }: Props) {
+export function ReportsPage({ initialClientId, onConsumedInitial, onOpenInvoice, onOpenQuote }: Props) {
   const clients = useStore((s) => s.clients);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function ReportsPage({ initialClientId, onConsumedInitial, onOpenInvoice 
         monthKey={selectedMonth}
         onBack={() => setSelectedMonth(null)}
         onOpenInvoice={onOpenInvoice}
+        onOpenQuote={onOpenQuote}
       />
     );
   }
@@ -56,6 +58,7 @@ export function ReportsPage({ initialClientId, onConsumedInitial, onOpenInvoice 
         clientId={selectedClientId}
         onBack={() => setSelectedClientId(null)}
         onSelectMonth={setSelectedMonth}
+        onOpenQuote={onOpenQuote}
       />
     );
   }
@@ -178,16 +181,24 @@ function ClientMonths({
   clientId,
   onBack,
   onSelectMonth,
+  onOpenQuote,
 }: {
   clientId: string;
   onBack: () => void;
   onSelectMonth: (key: string) => void;
+  onOpenQuote: (id: string) => void;
 }) {
   const client = useStore((s) => s.clients.find((c) => c.id === clientId));
   const projects = useStore((s) => s.projects);
   const entries = useStore((s) => s.entries);
   const rateOverrides = useStore((s) => s.rateOverrides);
   const settings = useStore((s) => s.settings);
+  const quotes = useStore((s) => s.quotes);
+  const createQuoteForMonth = useStore((s) => s.createQuoteForMonth);
+  const clientQuotes = useMemo(
+    () => quotes.filter((q) => q.clientId === clientId).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+    [quotes, clientId]
+  );
 
   const clientProjectIds = useMemo(
     () => new Set(projects.filter((p) => p.clientId === clientId).map((p) => p.id)),
@@ -268,6 +279,46 @@ function ClientMonths({
           ))}
         </div>
       )}
+
+      {/* Quotes for this client */}
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', margin: '26px 0 10px' }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600 }}>Quotes</h2>
+        <button className="btn" onClick={() => onOpenQuote(createQuoteForMonth(clientId).id)}>
+          <FileText size={14} /> New quote
+        </button>
+      </div>
+      {clientQuotes.length === 0 ? (
+        <div className="table">
+          <div className="empty" style={{ padding: 24 }}>
+            No quotes yet. Create one here, or from a month with <em>Generate quote</em>.
+          </div>
+        </div>
+      ) : (
+        <div className="table">
+          {clientQuotes.map((q) => {
+            const total = q.lineItems.reduce((a, li) => a + li.quantity * li.unitPrice, 0);
+            return (
+              <button
+                key={q.id}
+                className="table-row cols-months"
+                onClick={() => onOpenQuote(q.id)}
+                style={{ textAlign: 'left', width: '100%', background: 'transparent' }}
+              >
+                <div style={{ fontWeight: 600, letterSpacing: '-0.14px' }}>{q.number}</div>
+                <div className="mono" style={{ fontWeight: 500 }}>
+                  {q.lineItems.reduce((a, li) => a + li.quantity, 0)} h
+                </div>
+                <div className="mono" style={{ fontWeight: 500 }}>
+                  {formatMoney(total, q.currencySymbol || settings.currencySymbol)}
+                </div>
+                <div />
+                <div />
+                <div style={{ textAlign: 'right', color: 'var(--text-muted)' }}>›</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -278,11 +329,13 @@ function MonthDetail({
   monthKey,
   onBack,
   onOpenInvoice,
+  onOpenQuote,
 }: {
   clientId: string;
   monthKey: string;
   onBack: () => void;
   onOpenInvoice: (id: string) => void;
+  onOpenQuote: (id: string) => void;
 }) {
   const client = useStore((s) => s.clients.find((c) => c.id === clientId));
   const projects = useStore((s) => s.projects.filter((p) => p.clientId === clientId));
@@ -293,6 +346,7 @@ function MonthDetail({
   const settings = useStore((s) => s.settings);
   const invoices = useStore((s) => s.invoices);
   const generateInvoiceFromMonth = useStore((s) => s.generateInvoiceFromMonth);
+  const createQuoteForMonth = useStore((s) => s.createQuoteForMonth);
 
   const [editing, setEditing] = useState<Entry | null | undefined>(undefined);
   const [showCreateInvoice, setShowCreateInvoice] = useState(false);
@@ -397,6 +451,12 @@ function MonthDetail({
     onOpenInvoice(inv.id);
   };
 
+  const onGenerateQuote = () => {
+    if (!client) return;
+    const q = createQuoteForMonth(client.id, monthKey);
+    onOpenQuote(q.id);
+  };
+
   if (!client) return null;
 
   return (
@@ -413,6 +473,10 @@ function MonthDetail({
           <button className="btn" onClick={onGenerateInvoice}>
             <FileText size={14} />
             {existingInvoice ? `Open invoice ${existingInvoice.number}` : 'Generate invoice'}
+          </button>
+          <button className="btn" onClick={onGenerateQuote} title="Create a quote / estimate for this client's upcoming month">
+            <FileText size={14} />
+            Generate quote
           </button>
           <button className="btn" onClick={() => setShowCreateInvoice(true)}>
             More…

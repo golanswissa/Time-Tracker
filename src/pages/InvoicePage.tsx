@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Printer, Trash2, Lock, Unlock, RefreshCw, Save } from 'lucide-react';
 import { useStore } from '../store';
 import type { Invoice, InvoiceLineItem } from '../types';
-import { formatDDMMYYYY, formatMoney, uid } from '../utils';
+import { formatMoney, uid } from '../utils';
+import { EditableInline, EditableArea, EditableNumber, EditableMoney, EditableDate, PaymentLine } from '../components/docFields';
 
 interface Props {
   invoiceId: string;
@@ -417,134 +418,6 @@ export function InvoicePage({ invoiceId, onBack }: Props) {
           <strong>{client?.name ?? 'this client'}</strong> — new invoices will pre-fill with these.
         </div>
       )}
-    </div>
-  );
-}
-
-/* ---------------- editable primitives ---------------- */
-
-/** Inline input that hides its chrome until hover/focus, so the doc reads as plain text. */
-function EditableInline({
-  value, onChange, placeholder, disabled, className,
-}: {
-  value: string; onChange: (v: string) => void; placeholder?: string;
-  disabled?: boolean; className?: string;
-}) {
-  if (disabled) {
-    return <span className={className}>{value || placeholder || ''}</span>;
-  }
-  return (
-    <input
-      className={`inv-input ${className || ''}`}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
-
-function EditableArea({
-  value, onChange, placeholder, disabled, className,
-}: {
-  value: string; onChange: (v: string) => void; placeholder?: string;
-  disabled?: boolean; className?: string;
-}) {
-  if (disabled) {
-    return value
-      ? <div className={className} style={{ whiteSpace: 'pre-line' }}>{value}</div>
-      : null;
-  }
-  return (
-    <textarea
-      className={`inv-input inv-textarea ${className || ''}`}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      rows={3}
-    />
-  );
-}
-
-function EditableNumber({
-  value, onChange, disabled, className,
-}: {
-  value: number; onChange: (v: number) => void; disabled?: boolean; className?: string;
-}) {
-  const [text, setText] = useState<string>(String(value));
-  if (disabled) {
-    return <span className={className}>{value}</span>;
-  }
-  return (
-    <input
-      className={`inv-input ${className || ''}`}
-      value={text}
-      onChange={(e) => {
-        setText(e.target.value);
-        const n = Number(e.target.value);
-        if (!isNaN(n) && n >= 0) onChange(n);
-      }}
-      onBlur={() => setText(String(value))}
-      inputMode="decimal"
-    />
-  );
-}
-
-function EditableMoney({
-  value, onChange, disabled, symbol, className, short,
-}: {
-  value: number; onChange: (v: number) => void; disabled?: boolean;
-  symbol: string; className?: string; short?: boolean;
-}) {
-  const [text, setText] = useState<string>(String(value));
-  if (disabled) {
-    return (
-      <span className={className}>
-        {short ? `${symbol}${value}` : formatMoney(value, symbol)}
-      </span>
-    );
-  }
-  return (
-    <input
-      className={`inv-input ${className || ''}`}
-      value={text}
-      onChange={(e) => {
-        setText(e.target.value);
-        const n = Number(e.target.value);
-        if (!isNaN(n) && n >= 0) onChange(n);
-      }}
-      onBlur={() => setText(String(value))}
-      inputMode="decimal"
-    />
-  );
-}
-
-function EditableDate({
-  value, onChange, disabled,
-}: {
-  value: string; onChange: (v: string) => void; disabled?: boolean;
-}) {
-  if (disabled) {
-    return <span>{formatDDMMYYYY(value)}</span>;
-  }
-  return (
-    <input
-      type="date"
-      className="inv-input inv-date-input"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
-
-function PaymentLine({
-  label, value, onChange, disabled,
-}: {
-  label: string; value: string; onChange: (v: string) => void; disabled?: boolean;
-}) {
-  return (
-    <div className="inv-payment-line">
-      <span>{label}:&nbsp;</span>
-      <EditableInline value={value} disabled={disabled} onChange={onChange} />
     </div>
   );
 }

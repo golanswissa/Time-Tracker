@@ -797,6 +797,27 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -0.1504px;
 }
 
+/* The invoice/quote is a paper document — always a white sheet with black ink,
+   even in dark mode (otherwise the black text sits on a dark surface). */
+html.dark .invoice-page .invoice-doc { background: #fff; }
+
+/* ---- Quote-specific: intro + scope of work ---- */
+.quo-intro { margin: 20px 0 4px; color: #333; }
+.quo-intro .inv-input { font-size: 14px; }
+.quo-scope { margin-top: 22px; }
+.quo-scope-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.quo-scope-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid #ededed;
+}
+.quo-scope-num { color: #999; min-width: 18px; padding-top: 1px; font-variant-numeric: tabular-nums; }
+.quo-scope-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.quo-scope-title { font-weight: 600; font-size: 14px; }
+.quo-scope-detail.inv-textarea { color: #555; font-size: 13px; min-height: 22px; line-height: 19px; resize: none; }
+.quo-scope-x { flex-shrink: 0; }
+/* the quote's intro box shouldn't be a chunky textarea either */
+.quo-intro .inv-textarea { min-height: 24px; line-height: 20px; resize: none; }
+
 /* ---- Top header ---- */
 .inv-top {
   display: flex;

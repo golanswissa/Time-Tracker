@@ -146,6 +146,12 @@ export interface InvoicingSettings {
   defaultDueDays: number;
   /** Default tax rate (percentage, 0-100). 0 disables tax line. */
   defaultTaxRate: number;
+  /** Quote number prefix, e.g. "QUO-". */
+  quotePrefix?: string;
+  /** Next quote number to assign. Auto-increments on creation. */
+  quoteNextNumber?: number;
+  /** Default validity horizon for a quote, in days from issue date. */
+  quoteValidDays?: number;
 }
 
 export interface Settings {
@@ -190,6 +196,47 @@ export interface Invoice {
   currencySymbol: string;
   createdAt: string;
   finalizedAt?: string;
+}
+
+/* --------------------------------- Quotes -------------------------------- */
+
+/** One line of the "Scope of work" list on a quote (title + optional detail). */
+export interface QuoteScopeItem {
+  id: string;
+  title: string;
+  detail?: string;
+}
+
+/**
+ * A quote / estimate for upcoming work. Reuses the invoice's document chrome
+ * (From / Bill-To / payment / terms) but its body is a scope-of-work list plus
+ * an hours × rate estimate (reusing InvoiceLineItem for the pricing lines).
+ */
+export interface Quote {
+  id: string;
+  number: string; // e.g. QUO-001
+  issueDate: string; // YYYY-MM-DD
+  /** Quote is valid until this date. */
+  validUntil: string;
+  clientId: string;
+  /** The month this quote covers (YYYY-MM), if generated for one. */
+  monthKey?: string;
+  /** Snapshotted at creation; editable. */
+  billFrom: InvoiceFromDetails;
+  billTo: ClientBilling;
+  payment: InvoicePaymentDetails;
+  /** One-line intro above the scope list. */
+  intro?: string;
+  /** The scope-of-work items. */
+  scope: QuoteScopeItem[];
+  /** Pricing lines (hours × rate). Reuses the invoice line-item shape. */
+  lineItems: InvoiceLineItem[];
+  /** Tax rate (percentage). 0 means no tax line. */
+  taxRate: number;
+  notes?: string;
+  terms?: string;
+  currencySymbol: string;
+  createdAt: string;
 }
 
 export type Route =

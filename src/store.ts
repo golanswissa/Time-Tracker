@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { isCloudEnabled } from './supabase';
 import type {
   Client,
   Entry,
@@ -7,6 +8,7 @@ import type {
   InvoiceLineItem,
   InvoicingSettings,
   Project,
+  Quote,
   RateOverrides,
   ScheduledTask,
   Settings,
@@ -20,7 +22,9 @@ import {
   effectiveRate,
   entrySeconds,
   formatInvoiceNumber,
+  formatMonthLong,
   monthKeyFromDateKey,
+  parseMonthKey,
   roundHours,
   splitHoursIntoTiers,
   todayKey,
@@ -37,7 +41,20 @@ const DEFAULT_INVOICING: InvoicingSettings = {
   nextNumber: 1,
   defaultDueDays: 7,
   defaultTaxRate: 0,
+  quotePrefix: 'QUO-',
+  quoteNextNumber: 1,
+  quoteValidDays: 30,
 };
+
+/** Default "Scope of work" categories for a new monthly retainer quote. */
+const DEFAULT_QUOTE_SCOPE: string[] = [
+  'Ongoing features in the Slide system portal',
+  'Creation and build of new templates and variants for the Banner Builder',
+  'Updating the brand system portal',
+  'Updating icons and the image bank based on sales / PM requests',
+  'Realize ID asset creations',
+  'Ongoing Studio tasks',
+];
 
 interface State {
   clients: Client[];
@@ -45,6 +62,7 @@ interface State {
   tasks: Task[];
   entries: Entry[];
   invoices: Invoice[];
+  quotes: Quote[];
   scheduledTasks: ScheduledTask[];
   rateOverrides: RateOverrides;
   settings: Settings;
@@ -92,6 +110,10 @@ interface Actions {
   finalizeInvoice: (id: string) => void;
   reopenInvoice: (id: string) => void;
   deleteInvoice: (id: string) => void;
+  // Quotes
+  createQuoteForMonth: (clientId: string, monthKey?: string) => Quote;
+  updateQuote: (id: string, data: Partial<Quote>) => void;
+  deleteQuote: (id: string) => void;
 
   // Planner — scheduled tasks
   addScheduledTask: (data: Omit<ScheduledTask, 'id' | 'createdAt' | 'status'> & { status?: TaskStatus }) => ScheduledTask;
@@ -125,6 +147,7 @@ const initialState: State = {
   tasks: [],
   entries: [],
   invoices: [],
+  quotes: [],
   scheduledTasks: [],
   rateOverrides: {},
   settings: {
@@ -561,6 +584,71 @@ export const useStore = create<Store>()(
       deleteInvoice: (id) =>
         set((s) => ({ invoices: s.invoices.filter((inv) => inv.id !== id) })),
 
+      // ---------- Quotes ----------
+      createQuoteForMonth: (clientId, monthKey) => {
+        const state = get();
+        const client = state.clients.find((c) => c.id === clientId);
+        if (!client) throw new Error('Client not found');
+        const inv = state.settings.invoicing;
+
+        // Derive the tiered rates from the client's projects (fall back to the
+        // Realize default: first 100 h @ $100, then $80).
+        const projects = state.projects.filter((p) => p.clientId === clientId);
+        const tiers = projects.find((p) => p.rateTiers && p.rateTiers.length > 0)?.rateTiers;
+        const rate1 = tiers?.[0]?.rate ?? client.hourlyRate ?? 100;
+        const rate2 = tiers?.[1]?.rate ?? 80;
+        const cap1 = tiers?.[0]?.uptoHours ?? 100;
+
+        const issueDate = todayKey();
+        const validUntil = addDaysToKey(issueDate, inv.quoteValidDays ?? 30);
+        const number = formatInvoiceNumber(inv.quotePrefix || 'QUO-', inv.quoteNextNumber || 1);
+        const monthLabel = monthKey ? formatMonthLong(parseMonthKey(monthKey)) : '';
+
+        const quote: Quote = {
+          id: uid(),
+          number,
+          issueDate,
+          validUntil,
+          clientId,
+          monthKey,
+          // Pull From / Payment from your invoicing settings and Bill-To from
+          // the client's billing — same source the invoice uses.
+          billFrom: { ...inv.from },
+          billTo: { ...(client.billing ?? {}) },
+          payment: { ...inv.payment },
+          intro: monthLabel
+            ? `Estimate for the ${monthLabel} monthly design retainer.`
+            : 'Estimate for the monthly design retainer.',
+          scope: DEFAULT_QUOTE_SCOPE.map((title) => ({ id: uid(), title })),
+          lineItems: [
+            { id: uid(), description: `Monthly design & studio retainer — first ${cap1} hours`, quantity: cap1, unitPrice: rate1 },
+            { id: uid(), description: `Additional hours above ${cap1}`, quantity: 100, unitPrice: rate2 },
+          ],
+          taxRate: inv.defaultTaxRate || 0,
+          terms: 'This is an estimate for the work described above; final billing is based on hours actually tracked.',
+          currencySymbol: state.settings.currencySymbol,
+          createdAt: new Date().toISOString(),
+        };
+
+        set((s) => ({
+          quotes: [...s.quotes, quote],
+          settings: {
+            ...s.settings,
+            invoicing: {
+              ...s.settings.invoicing,
+              quoteNextNumber: (s.settings.invoicing.quoteNextNumber || 1) + 1,
+            },
+          },
+        }));
+        return quote;
+      },
+      updateQuote: (id, data) =>
+        set((s) => ({
+          quotes: s.quotes.map((q) => (q.id === id ? { ...q, ...data } : q)),
+        })),
+      deleteQuote: (id) =>
+        set((s) => ({ quotes: s.quotes.filter((q) => q.id !== id) })),
+
       // ---------- Planner: scheduled tasks ----------
       addScheduledTask: (data) => {
         const t: ScheduledTask = {
@@ -674,9 +762,9 @@ export const useStore = create<Store>()(
 
       // ---------- Data ----------
       exportAll: () => {
-        const { clients, projects, tasks, entries, invoices, scheduledTasks, rateOverrides, settings } = get();
+        const { clients, projects, tasks, entries, invoices, quotes, scheduledTasks, rateOverrides, settings } = get();
         return JSON.stringify(
-          { version: 5, clients, projects, tasks, entries, invoices, scheduledTasks, rateOverrides, settings },
+          { version: 6, clients, projects, tasks, entries, invoices, quotes, scheduledTasks, rateOverrides, settings },
           null,
           2
         );
@@ -690,6 +778,7 @@ export const useStore = create<Store>()(
             tasks = [],
             entries = [],
             invoices = [],
+            quotes = [],
             scheduledTasks = [],
             rateOverrides,
             settings,
@@ -712,6 +801,7 @@ export const useStore = create<Store>()(
             tasks,
             entries,
             invoices,
+            quotes: Array.isArray(quotes) ? quotes : [],
             scheduledTasks: Array.isArray(scheduledTasks) ? scheduledTasks : [],
             rateOverrides: rateOverrides && typeof rateOverrides === 'object' ? rateOverrides : {},
             settings: normalizeSettings(settings),
@@ -739,6 +829,7 @@ export const useStore = create<Store>()(
           clients: migrated.clients ?? p.clients ?? [],
           projects: migrated.projects ?? p.projects ?? [],
           invoices: p.invoices ?? [],
+          quotes: p.quotes ?? [],
           scheduledTasks: p.scheduledTasks ?? [],
           rateOverrides: p.rateOverrides ?? {},
           settings: normalizeSettings(p.settings),
@@ -750,6 +841,12 @@ export const useStore = create<Store>()(
 
 // --- seed defaults for first run ---
 export const seedIfEmpty = () => {
+  // NEVER seed demo data when cloud sync is on. A returning user's data lives in
+  // the cloud and is restored a moment after boot; seeding here races with that
+  // restore and — worse — the seed mutations can be pushed up and clobber the
+  // real cloud data. Cloud users simply start from their cloud state (empty only
+  // if they genuinely have nothing yet).
+  if (isCloudEnabled) return;
   const { clients, projects, tasks, addClient, addProject, addTask } = useStore.getState();
   if (clients.length === 0) {
     const personal = addClient({ name: 'Personal', color: '#171717', hourlyRate: undefined });
