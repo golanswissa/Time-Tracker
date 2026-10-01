@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../store';
+import type { RetainerSettings } from '../types';
 
 export function SettingsPage() {
   const settings = useStore((s) => s.settings);
@@ -8,9 +9,36 @@ export function SettingsPage() {
   const exportAll = useStore((s) => s.exportAll);
   const importAll = useStore((s) => s.importAll);
   const clearAll = useStore((s) => s.clearAll);
+  const clients = useStore((s) => s.clients);
+  const runMonthlyBillingIfDue = useStore((s) => s.runMonthlyBillingIfDue);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  const ret: RetainerSettings = settings.retainer ?? {
+    enabled: false, dayOfMonth: 29, monthlyCap: 18000, monthlyTarget: 18350,
+    tier1Hours: 100, tier1Rate: 100, tier2Rate: 80,
+  };
+  const setRet = (patch: Partial<RetainerSettings>) =>
+    updateSettings({ retainer: { ...ret, ...patch } });
+
+  const handleRunNow = () => {
+    const r = runMonthlyBillingIfDue(true);
+    if (!r) {
+      setMsg({ kind: 'err', text: 'Nothing to run — check the retainer client is set.' });
+      return;
+    }
+    const made = [
+      r.createdInvoice ? `invoice for ${r.invoiceMonth}` : null,
+      r.createdQuote ? `quote for ${r.quoteMonth}` : null,
+    ].filter(Boolean).join(' and ');
+    setMsg({
+      kind: 'ok',
+      text: made
+        ? `Drafted the ${made}. Find them under Invoices and Reports → client → Quotes.`
+        : `Already done — the ${r.invoiceMonth} invoice and ${r.quoteMonth} quote both exist.`,
+    });
+  };
 
   const handleExport = () => {
     const data = exportAll();
@@ -246,6 +274,127 @@ export function SettingsPage() {
               onChange={(e) => updateInvoicingSettings({ terms: e.target.value })}
             />
           </div>
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <h2>Recurring billing</h2>
+        <p className="desc">
+          On the chosen day each month the app drafts the invoice for the month that&apos;s ending and the
+          quote securing the next one. Both arrive as drafts — nothing is ever sent automatically.
+        </p>
+        <div className="settings-row">
+          <div>
+            <div className="label">Automatic monthly run</div>
+            <div className="sub">
+              {ret.enabled
+                ? ret.lastRunMonth
+                  ? `On — last run covered ${ret.lastRunMonth}.`
+                  : 'On — will run on the next due day.'
+                : 'Off — switch on and pick the retainer client.'}
+            </div>
+          </div>
+          <div className="seg">
+            <button className={ret.enabled ? 'active' : ''} onClick={() => setRet({ enabled: true })}>On</button>
+            <button className={!ret.enabled ? 'active' : ''} onClick={() => setRet({ enabled: false })}>Off</button>
+          </div>
+        </div>
+
+        <div className="modal-row">
+          <div className="field">
+            <label>Retainer client</label>
+            <select
+              className="select"
+              value={ret.clientId || ''}
+              onChange={(e) => setRet({ clientId: e.target.value || undefined })}
+            >
+              <option value="">Choose a client…</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>Run on day of month</label>
+            <input
+              className="input mono"
+              value={String(ret.dayOfMonth)}
+              inputMode="numeric"
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (!isNaN(n) && n >= 1 && n <= 31) setRet({ dayOfMonth: Math.floor(n) });
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="modal-row">
+          <div className="field">
+            <label>Agreed monthly cap</label>
+            <input
+              className="input mono"
+              value={String(ret.monthlyCap)}
+              inputMode="decimal"
+              onChange={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) setRet({ monthlyCap: n }); }}
+            />
+            <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
+              The ceiling agreed with the client.
+            </span>
+          </div>
+          <div className="field">
+            <label>Invoice target</label>
+            <input
+              className="input mono"
+              value={String(ret.monthlyTarget ?? ret.monthlyCap)}
+              inputMode="decimal"
+              onChange={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) setRet({ monthlyTarget: n }); }}
+            />
+            <span style={{ color: 'var(--text-subtle)', fontSize: 12 }}>
+              What invoices aim for — a little above the cap so totals don&apos;t read as artificially round.
+            </span>
+          </div>
+        </div>
+
+        <div className="modal-row">
+          <div className="field">
+            <label>First-tier hours</label>
+            <input
+              className="input mono"
+              value={String(ret.tier1Hours)}
+              inputMode="decimal"
+              onChange={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) setRet({ tier1Hours: n }); }}
+            />
+          </div>
+          <div className="field">
+            <label>First-tier rate / hr</label>
+            <input
+              className="input mono"
+              value={String(ret.tier1Rate)}
+              inputMode="decimal"
+              onChange={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) setRet({ tier1Rate: n }); }}
+            />
+          </div>
+        </div>
+
+        <div className="modal-row">
+          <div className="field">
+            <label>Rate after that / hr</label>
+            <input
+              className="input mono"
+              value={String(ret.tier2Rate)}
+              inputMode="decimal"
+              onChange={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) setRet({ tier2Rate: n }); }}
+            />
+          </div>
+          <div className="field" />
+        </div>
+
+        <div className="settings-row">
+          <div>
+            <div className="label">Run now</div>
+            <div className="sub">Draft this cycle&apos;s invoice and quote immediately, without waiting for the day.</div>
+          </div>
+          <button className="btn" onClick={handleRunNow} disabled={!ret.enabled || !ret.clientId}>
+            Run now
+          </button>
         </div>
       </div>
 

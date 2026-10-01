@@ -797,6 +797,22 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -0.1504px;
 }
 
+/* Monthly-billing banner — shown once after the 29th run drafts the documents */
+.wk-runbanner{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin:0 0 18px; padding:12px 14px; border-radius:10px;
+  background:color-mix(in srgb, var(--wk-yellow) 32%, transparent);
+  border:1px solid color-mix(in srgb, var(--wk-yellow) 60%, transparent);
+  font-size:13.5px; color:var(--text);
+}
+.wk-runbanner span{ flex:1; min-width:220px; }
+.wk-runbanner button{
+  border:1px solid var(--gray-100); background:var(--surface); color:var(--text);
+  border-radius:999px; padding:5px 13px; font-size:12.5px; font-weight:600; cursor:pointer;
+}
+.wk-runbanner button:hover{ border-color:var(--text); }
+.wk-runbanner button.x{ border:none; background:none; font-size:17px; padding:0 4px; color:var(--text-muted); }
+
 /* The invoice/quote is a paper document — always a white sheet with black ink,
    even in dark mode (otherwise the black text sits on a dark surface). */
 html.dark .invoice-page .invoice-doc { background: #fff; }

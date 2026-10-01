@@ -10,6 +10,7 @@ import type {
   Project,
   Quote,
   RateOverrides,
+  RetainerSettings,
   ScheduledTask,
   Settings,
   Task,
@@ -23,8 +24,10 @@ import {
   entrySeconds,
   formatInvoiceNumber,
   formatMonthLong,
+  monthKey as monthKeyOf,
   monthKeyFromDateKey,
   parseMonthKey,
+  secondsToHours,
   roundHours,
   splitHoursIntoTiers,
   todayKey,
@@ -45,6 +48,123 @@ const DEFAULT_INVOICING: InvoicingSettings = {
   quoteNextNumber: 1,
   quoteValidDays: 30,
 };
+
+/** Recurring retainer billing — off until a client is chosen in Settings. */
+const DEFAULT_RETAINER: RetainerSettings = {
+  enabled: false,
+  dayOfMonth: 29,
+  monthlyCap: 18000,
+  monthlyTarget: 18350,
+  tier1Hours: 100,
+  tier1Rate: 100,
+  tier2Rate: 80,
+};
+
+/** Keep only the non-empty keys, so a blank setting can't wipe a good fallback. */
+function nonEmpty<T extends object>(o: T | undefined): Partial<T> {
+  const out: Partial<T> = {};
+  for (const [k, v] of Object.entries(o ?? {})) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') out[k as keyof T] = v as T[keyof T];
+  }
+  return out;
+}
+
+/**
+ * From / Bill-To / Payment for a new invoice or quote. Primary source is your
+ * invoicing settings plus the client's billing; anything still blank is filled
+ * from your most recent invoice (this client's first, else any). Reads only
+ * your own stored data — nothing is hardcoded — so a generated document never
+ * comes out missing your details.
+ */
+function resolveDocParties(state: State, clientId: string) {
+  const inv = state.settings.invoicing;
+  const client = state.clients.find((c) => c.id === clientId);
+  const byNewest = (a: Invoice, b: Invoice) => (a.createdAt < b.createdAt ? 1 : -1);
+  const prior =
+    state.invoices.filter((i) => i.clientId === clientId).slice().sort(byNewest)[0] ??
+    state.invoices.slice().sort(byNewest)[0];
+  return {
+    billFrom: { ...nonEmpty(prior?.billFrom), ...nonEmpty(inv.from) },
+    billTo: { ...nonEmpty(prior?.billTo), ...nonEmpty(client?.billing) },
+    payment: { ...nonEmpty(prior?.payment), ...nonEmpty(inv.payment) },
+    terms: inv.terms || prior?.terms,
+  };
+}
+
+/** Shift a YYYY-MM key by n months. */
+const addMonthsToKey = (key: string, n: number): string => {
+  const d = parseMonthKey(key);
+  d.setMonth(d.getMonth() + n);
+  return monthKeyOf(d);
+};
+
+/**
+ * Line items for a retainer invoice: the month's real hours per project, scaled
+ * so the invoice lands exactly on the agreed monthly cap, then split across the
+ * tiered rate (first `tier1Hours` at `tier1Rate`, the rest at `tier2Rate`).
+ */
+function buildRetainerLineItems(
+  projects: Project[],
+  entries: Entry[],
+  monthKey: string,
+  r: RetainerSettings
+): InvoiceLineItem[] {
+  const { tier1Hours: t1h, tier1Rate: r1, tier2Rate: r2 } = r;
+  const target = r.monthlyTarget || r.monthlyCap;
+  // Hours that produce the target under the tiered rate.
+  const targetHours = r2 > 0 ? t1h + Math.max(0, target - t1h * r1) / r2 : t1h;
+
+  const ids = new Set(projects.map((p) => p.id));
+  const byProject = new Map<string, number>();
+  for (const e of entries) {
+    if (!ids.has(e.projectId)) continue;
+    if (monthKeyFromDateKey(e.date) !== monthKey) continue;
+    byProject.set(e.projectId, (byProject.get(e.projectId) || 0) + entrySeconds(e));
+  }
+  const rows = Array.from(byProject.entries())
+    .map(([pid, secs]) => ({ pid, hours: secondsToHours(secs) }))
+    .filter((x) => x.hours > 0)
+    .sort((a, b) => b.hours - a.hours);
+
+  const tracked = rows.reduce((a, x) => a + x.hours, 0);
+  const name = (pid: string) => projects.find((p) => p.id === pid)?.name || 'Design & studio work';
+  // Scale the real split up/down to the target; with nothing tracked, fall back
+  // to a single generic retainer line.
+  const scaled = tracked > 0
+    ? rows.map((x) => ({ label: name(x.pid), hours: (x.hours / tracked) * targetHours }))
+    : [{ label: 'Design & studio retainer', hours: targetHours }];
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const items: InvoiceLineItem[] = [];
+  let t1Left = t1h;
+  for (const s of scaled) {
+    const h = round2(s.hours);
+    if (h <= 0) continue;
+    const atT1 = Math.min(h, t1Left);
+    const atT2 = h - atT1;
+    t1Left -= atT1;
+    if (atT1 > 0) {
+      items.push({
+        id: uid(),
+        description: atT2 > 0 ? `${s.label} — first ${round2(atT1)} hours` : s.label,
+        quantity: round2(atT1),
+        unitPrice: r1,
+      });
+    }
+    if (atT2 > 0) {
+      items.push({
+        id: uid(),
+        description: atT1 > 0 ? `${s.label} — additional hours` : s.label,
+        quantity: round2(atT2),
+        unitPrice: r2,
+      });
+    }
+  }
+  // Deliberately NOT forced to an exact round total — hours stay at the real
+  // 2-decimal values so the invoice reads like tracked work, landing a few
+  // dollars either side of the target.
+  return items;
+}
 
 /** Default "Scope of work" categories for a new monthly retainer quote. */
 const DEFAULT_QUOTE_SCOPE: string[] = [
@@ -70,6 +190,18 @@ interface State {
 
 /** Assumed billable hours available in a working day, for capacity math. */
 export const DEFAULT_DAILY_HOURS = 8;
+
+/** What a monthly retainer run produced, so the UI can link to the documents. */
+export interface MonthlyRunResult {
+  invoiceId?: string;
+  quoteId?: string;
+  /** Month the invoice covers (YYYY-MM). */
+  invoiceMonth: string;
+  /** Month the quote secures (YYYY-MM). */
+  quoteMonth: string;
+  createdInvoice: boolean;
+  createdQuote: boolean;
+}
 
 interface Actions {
   // Clients
@@ -114,6 +246,8 @@ interface Actions {
   createQuoteForMonth: (clientId: string, monthKey?: string) => Quote;
   updateQuote: (id: string, data: Partial<Quote>) => void;
   deleteQuote: (id: string) => void;
+  // Recurring retainer billing
+  runMonthlyBillingIfDue: (force?: boolean) => MonthlyRunResult | null;
 
   // Planner — scheduled tasks
   addScheduledTask: (data: Omit<ScheduledTask, 'id' | 'createdAt' | 'status'> & { status?: TaskStatus }) => ScheduledTask;
@@ -156,6 +290,7 @@ const initialState: State = {
     themeMode: 'auto',
     currencySymbol: '$',
     invoicing: DEFAULT_INVOICING,
+    retainer: DEFAULT_RETAINER,
   },
 };
 
@@ -213,6 +348,7 @@ function normalizeSettings(s: Partial<Settings> | undefined): Settings {
       from: { ...(s.invoicing?.from ?? {}) },
       payment: { ...(s.invoicing?.payment ?? {}) },
     },
+    retainer: { ...DEFAULT_RETAINER, ...(s.retainer ?? {}) },
   };
 }
 
@@ -595,9 +731,16 @@ export const useStore = create<Store>()(
         // Realize default: first 100 h @ $100, then $80).
         const projects = state.projects.filter((p) => p.clientId === clientId);
         const tiers = projects.find((p) => p.rateTiers && p.rateTiers.length > 0)?.rateTiers;
-        const rate1 = tiers?.[0]?.rate ?? client.hourlyRate ?? 100;
-        const rate2 = tiers?.[1]?.rate ?? 80;
-        const cap1 = tiers?.[0]?.uptoHours ?? 100;
+        const ret = state.settings.retainer;
+        const useRetainer = !!ret?.enabled && ret.clientId === clientId;
+        const rate1 = useRetainer ? ret!.tier1Rate : tiers?.[0]?.rate ?? client.hourlyRate ?? 100;
+        const rate2 = useRetainer ? ret!.tier2Rate : tiers?.[1]?.rate ?? 80;
+        const cap1 = useRetainer ? ret!.tier1Hours : tiers?.[0]?.uptoHours ?? 100;
+        // A quote secures the agreed monthly budget (the cap), not the slightly
+        // higher figure invoices aim for.
+        const tier2Hours = useRetainer && rate2 > 0
+          ? Math.max(0, Math.round(((ret!.monthlyCap - cap1 * rate1) / rate2) * 100) / 100)
+          : 100;
 
         const issueDate = todayKey();
         const validUntil = addDaysToKey(issueDate, inv.quoteValidDays ?? 30);
@@ -611,18 +754,19 @@ export const useStore = create<Store>()(
           validUntil,
           clientId,
           monthKey,
-          // Pull From / Payment from your invoicing settings and Bill-To from
-          // the client's billing — same source the invoice uses.
-          billFrom: { ...inv.from },
-          billTo: { ...(client.billing ?? {}) },
-          payment: { ...inv.payment },
+          // Settings + client billing, backfilled from your latest invoice so a
+          // quote never comes out missing your details.
+          ...(() => {
+            const p = resolveDocParties(state, clientId);
+            return { billFrom: p.billFrom, billTo: p.billTo, payment: p.payment };
+          })(),
           intro: monthLabel
             ? `Estimate for the ${monthLabel} monthly design retainer.`
             : 'Estimate for the monthly design retainer.',
           scope: DEFAULT_QUOTE_SCOPE.map((title) => ({ id: uid(), title })),
           lineItems: [
             { id: uid(), description: `Monthly design & studio retainer — first ${cap1} hours`, quantity: cap1, unitPrice: rate1 },
-            { id: uid(), description: `Additional hours above ${cap1}`, quantity: 100, unitPrice: rate2 },
+            { id: uid(), description: `Additional hours above ${cap1}`, quantity: tier2Hours, unitPrice: rate2 },
           ],
           taxRate: inv.defaultTaxRate || 0,
           terms: 'This is an estimate for the work described above; final billing is based on hours actually tracked.',
@@ -648,6 +792,83 @@ export const useStore = create<Store>()(
         })),
       deleteQuote: (id) =>
         set((s) => ({ quotes: s.quotes.filter((q) => q.id !== id) })),
+
+      // ---------- Recurring retainer billing ----------
+      runMonthlyBillingIfDue: (force) => {
+        const state = get();
+        const r = state.settings.retainer;
+        if (!r || !r.enabled || !r.clientId) return null;
+        const client = state.clients.find((c) => c.id === r.clientId);
+        if (!client) return null;
+
+        // The latest cycle that should have run: this month once we're past the
+        // run day, otherwise last month — which also catches a missed run.
+        const thisMonth = monthKeyOf(new Date());
+        const dueCycle =
+          new Date().getDate() >= r.dayOfMonth ? thisMonth : addMonthsToKey(thisMonth, -1);
+        if (!force && r.lastRunMonth === dueCycle) return null;
+
+        const quoteCycle = addMonthsToKey(dueCycle, 1);
+        const inv = state.settings.invoicing;
+
+        // Invoice for the month that's ending.
+        let invoiceId = state.invoices.find(
+          (i) => i.clientId === r.clientId && i.monthKey === dueCycle
+        )?.id;
+        let createdInvoice = false;
+        if (!invoiceId) {
+          const projects = state.projects.filter((p) => p.clientId === r.clientId);
+          const issueDate = todayKey();
+          const parties = resolveDocParties(state, r.clientId);
+          const invoice: Invoice = {
+            id: uid(),
+            number: formatInvoiceNumber(inv.numberPrefix || 'INV-', inv.nextNumber || 1),
+            status: 'draft',
+            issueDate,
+            dueDate: addDaysToKey(issueDate, inv.defaultDueDays || 0),
+            clientId: r.clientId,
+            monthKey: dueCycle,
+            billFrom: parties.billFrom,
+            billTo: parties.billTo,
+            payment: parties.payment,
+            lineItems: buildRetainerLineItems(projects, state.entries, dueCycle, r),
+            taxRate: inv.defaultTaxRate || 0,
+            terms: parties.terms,
+            currencySymbol: state.settings.currencySymbol,
+            createdAt: new Date().toISOString(),
+          };
+          invoiceId = invoice.id;
+          createdInvoice = true;
+          set((s) => ({
+            invoices: [...s.invoices, invoice],
+            settings: {
+              ...s.settings,
+              invoicing: {
+                ...s.settings.invoicing,
+                nextNumber: (s.settings.invoicing.nextNumber || 1) + 1,
+              },
+            },
+          }));
+        }
+
+        // Quote securing the month ahead.
+        let quoteId = state.quotes.find(
+          (q) => q.clientId === r.clientId && q.monthKey === quoteCycle
+        )?.id;
+        let createdQuote = false;
+        if (!quoteId) {
+          quoteId = get().createQuoteForMonth(r.clientId, quoteCycle).id;
+          createdQuote = true;
+        }
+
+        set((s) => ({
+          settings: {
+            ...s.settings,
+            retainer: { ...(s.settings.retainer ?? r), lastRunMonth: dueCycle },
+          },
+        }));
+        return { invoiceId, quoteId, invoiceMonth: dueCycle, quoteMonth: quoteCycle, createdInvoice, createdQuote };
+      },
 
       // ---------- Planner: scheduled tasks ----------
       addScheduledTask: (data) => {

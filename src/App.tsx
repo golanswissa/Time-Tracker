@@ -10,7 +10,8 @@ import { InvoicesPage } from './pages/InvoicesPage';
 import { InvoicePage } from './pages/InvoicePage';
 import { QuotePage } from './pages/QuotePage';
 import type { Route } from './types';
-import { seedIfEmpty } from './store';
+import { seedIfEmpty, useStore, type MonthlyRunResult } from './store';
+import { formatMonthLong, parseMonthKey } from './utils';
 
 const ALL_ROUTES: Route[] = ['today', 'plan', 'timer', 'clients', 'reports', 'projects', 'tasks', 'invoices', 'settings'];
 
@@ -35,7 +36,18 @@ export default function App() {
   const [openQuoteId, setOpenQuoteId] = useState<string | null>(quoteFromParam(initial.route, initial.param));
   const [reportsInitialClient, setReportsInitialClient] = useState<string | null>(null);
 
-  useEffect(() => { seedIfEmpty(); }, []);
+  const runMonthlyBillingIfDue = useStore((s) => s.runMonthlyBillingIfDue);
+  const [monthlyRun, setMonthlyRun] = useState<MonthlyRunResult | null>(null);
+
+  useEffect(() => {
+    seedIfEmpty();
+    // Draft this cycle's invoice + next month's quote once we're past the run
+    // day (and catch a missed month). Safe to call on every boot — it no-ops
+    // once the cycle has run.
+    const r = runMonthlyBillingIfDue();
+    if (r && (r.createdInvoice || r.createdQuote)) setMonthlyRun(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (route === 'invoices' && openInvoiceId) {
@@ -74,6 +86,26 @@ export default function App() {
 
   return (
     <AppShell route={isDay ? 'today' : route} onNavigate={navigate}>
+      {monthlyRun && (
+        <div className="wk-runbanner no-print">
+          <span>
+            <strong>Monthly billing drafted.</strong>{' '}
+            {formatMonthLong(parseMonthKey(monthlyRun.invoiceMonth))} invoice and{' '}
+            {formatMonthLong(parseMonthKey(monthlyRun.quoteMonth))} quote are ready to review.
+          </span>
+          {monthlyRun.invoiceId && (
+            <button onClick={() => { openInvoice(monthlyRun.invoiceId!); setMonthlyRun(null); }}>
+              Open invoice
+            </button>
+          )}
+          {monthlyRun.quoteId && (
+            <button onClick={() => { openQuote(monthlyRun.quoteId!); setMonthlyRun(null); }}>
+              Open quote
+            </button>
+          )}
+          <button className="x" onClick={() => setMonthlyRun(null)} aria-label="Dismiss">×</button>
+        </div>
+      )}
       {isDay && <DayView />}
       {route === 'clients' && <ClientsPage onOpenReport={gotoReports} />}
       {route === 'reports' && (

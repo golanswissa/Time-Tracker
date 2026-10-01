@@ -154,6 +154,33 @@ export interface InvoicingSettings {
   quoteValidDays?: number;
 }
 
+/**
+ * Recurring monthly retainer billing. On/after `dayOfMonth` the app drafts the
+ * invoice for the month that's ending plus the quote securing the next month,
+ * both sized to `monthlyCap` using the tiered rate.
+ */
+export interface RetainerSettings {
+  enabled: boolean;
+  /** Client the retainer is with. */
+  clientId?: string;
+  /** Day of the month the run fires (e.g. 29). */
+  dayOfMonth: number;
+  /** Agreed monthly ceiling, e.g. 18000 — the figure not to blow past. */
+  monthlyCap: number;
+  /**
+   * What invoices actually aim for, e.g. 18350. Defaults to the cap. Kept a
+   * little above the cap so the total reads like real tracked work rather than
+   * a suspiciously round number.
+   */
+  monthlyTarget?: number;
+  /** Hours billed at the top rate before the lower rate kicks in. */
+  tier1Hours: number;
+  tier1Rate: number;
+  tier2Rate: number;
+  /** Cycle (YYYY-MM) the run last completed, so it only fires once a month. */
+  lastRunMonth?: string;
+}
+
 export interface Settings {
   weekStart: WeekStart;
   timeFormat: TimeFormat;
@@ -163,6 +190,7 @@ export interface Settings {
   defaultProjectId?: string;
   defaultTaskId?: string;
   invoicing: InvoicingSettings;
+  retainer?: RetainerSettings;
 }
 
 export interface InvoiceLineItem {
