@@ -1050,6 +1050,9 @@ html.dark .invoice-page .invoice-doc { background: #fff; }
     background: transparent !important;
     padding: 0 !important;
   }
+  /* Placeholders are editing hints, never document content — without this an
+     untouched field prints its hint ("Optional detail…", "Contact name"…). */
+  .invoice-doc ::placeholder { color: transparent !important; opacity: 0 !important; }
   .inv-textarea { min-height: 0 !important; }
   .inv-li-actions { display: none !important; }
   .inv-items-head, .inv-items-row {
