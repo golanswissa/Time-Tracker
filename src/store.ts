@@ -736,10 +736,12 @@ export const useStore = create<Store>()(
         const rate1 = useRetainer ? ret!.tier1Rate : tiers?.[0]?.rate ?? client.hourlyRate ?? 100;
         const rate2 = useRetainer ? ret!.tier2Rate : tiers?.[1]?.rate ?? 80;
         const cap1 = useRetainer ? ret!.tier1Hours : tiers?.[0]?.uptoHours ?? 100;
-        // A quote secures the agreed monthly budget (the cap), not the slightly
-        // higher figure invoices aim for.
+        // A quote secures what you'll actually invoice (the target), so the PO
+        // it backs can't come in short of the invoice. Hours keep their real
+        // 2-decimal value rather than landing on a round total.
+        const quoteTotal = useRetainer ? ret!.monthlyTarget || ret!.monthlyCap : 0;
         const tier2Hours = useRetainer && rate2 > 0
-          ? Math.max(0, Math.round(((ret!.monthlyCap - cap1 * rate1) / rate2) * 100) / 100)
+          ? Math.max(0, Math.round(((quoteTotal - cap1 * rate1) / rate2) * 100) / 100)
           : 100;
 
         const issueDate = todayKey();
